@@ -1,8 +1,8 @@
+# %%
 import re
 from pathlib import Path
 
 import pandas as pd
-pip install plotly
 import plotly.express as px
 import streamlit as st
 
@@ -1010,3 +1010,5 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+
