@@ -895,6 +895,8 @@ PAGE_TAGS = {
     "Data & Methods": "Behind data"
 }
 
+# Read selected page from the URL.
+# Example: ?page=World%20Record%20Timeline
 query_page = st.query_params.get("page", "Home")
 
 if isinstance(query_page, list):
@@ -902,41 +904,36 @@ if isinstance(query_page, list):
 
 page = query_page if query_page in PAGES else "Home"
 
+# Build the lane buttons as ONE compact HTML string.
+# Important: no multi-line indented HTML here, otherwise Streamlit may print it as code.
 nav_items = ""
 
 for i, page_name in enumerate(PAGES, start=1):
     active_class = " active" if page == page_name else ""
     page_url = quote(page_name, safe="")
 
-    nav_items += f"""
-        <a class="pool-lane{active_class}" href="?page={page_url}">
-            <span class="lane-number">Lane {i}</span>
-            <span class="lane-label">{PAGE_LABELS[page_name]}</span>
-            <span class="lane-tag">{PAGE_TAGS[page_name]}</span>
-        </a>
-    """
+    nav_items += (
+        f'<a class="pool-lane{active_class}" href="?page={page_url}">'
+        f'<span class="lane-number">Lane {i}</span>'
+        f'<span class="lane-label">{PAGE_LABELS[page_name]}</span>'
+        f'<span class="lane-tag">{PAGE_TAGS[page_name]}</span>'
+        f'</a>'
+    )
 
-st.markdown(
-    f"""
-    <div class="pool-nav-shell">
-        <div class="pool-nav-top">
-            <div class="pool-brand">🏊 Swim Records Explorer</div>
-            <div class="pool-subtitle">
-                Select a lane to dive into swimming records, rankings, athletes and nations.
-            </div>
-        </div>
-
-        <div class="pool-grid">
-            {nav_items}
-        </div>
-
-        <div class="current-lane">
-            Current lane: <b>{PAGE_LABELS[page]}</b>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
+nav_html = (
+    '<div class="pool-nav-shell">'
+    '<div class="pool-nav-top">'
+    '<div class="pool-brand">🏊 Swim Records Explorer</div>'
+    '<div class="pool-subtitle">'
+    'Select a lane to dive into swimming records, rankings, athletes and nations.'
+    '</div>'
+    '</div>'
+    f'<div class="pool-grid">{nav_items}</div>'
+    f'<div class="current-lane">Current lane: <b>{PAGE_LABELS[page]}</b></div>'
+    '</div>'
 )
+
+st.markdown(nav_html, unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("## 🏊 Filters")
