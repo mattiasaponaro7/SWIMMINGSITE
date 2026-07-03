@@ -1,11 +1,13 @@
 import re
 from pathlib import Path
+from urllib.parse import quote
 
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+
 
 
 # ============================================================
@@ -16,7 +18,7 @@ st.set_page_config(
     page_title="Swim Records Explorer",
     page_icon="🏊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 px.defaults.template = "plotly_white"
@@ -164,6 +166,233 @@ st.markdown(
     div[data-testid="stSidebar"] {
         background-color: #EFF8FB;
     }
+
+    /* ============================================================
+       TOP NAVIGATION - OLYMPIC SWIMMING POOL
+    ============================================================ */
+
+    .block-container {
+        padding-top: 1.2rem;
+    }
+
+    .pool-nav-shell {
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        background: rgba(247, 251, 253, 0.92);
+        backdrop-filter: blur(16px);
+        border: 1px solid #D8ECF4;
+        border-radius: 26px;
+        padding: 18px 20px 20px 20px;
+        margin-bottom: 28px;
+        box-shadow: 0 12px 34px rgba(5,43,68,0.10);
+    }
+
+    .pool-nav-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 16px;
+        margin-bottom: 14px;
+    }
+
+    .pool-brand {
+        color: #052B44;
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+    }
+
+    .pool-subtitle {
+        color: #52616B;
+        font-size: 13px;
+        font-weight: 650;
+        text-align: right;
+        max-width: 420px;
+        line-height: 1.35;
+    }
+
+    .pool-grid {
+        display: grid;
+        grid-template-columns: repeat(8, minmax(86px, 1fr));
+        gap: 9px;
+    }
+
+    .pool-lane {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        justify-content: end;
+        min-height: 104px;
+        padding: 12px 10px;
+        border-radius: 18px;
+        overflow: hidden;
+        text-decoration: none !important;
+        color: white !important;
+        border: 1px solid rgba(255,255,255,0.72);
+        box-shadow:
+            inset 3px 0 0 rgba(255,255,255,0.70),
+            inset -3px 0 0 rgba(255,255,255,0.70),
+            0 8px 18px rgba(5,43,68,0.10);
+        background:
+            linear-gradient(90deg,
+                rgba(255,255,255,0.72) 0px,
+                rgba(255,255,255,0.72) 2px,
+                transparent 2px,
+                transparent calc(100% - 2px),
+                rgba(255,255,255,0.72) calc(100% - 2px),
+                rgba(255,255,255,0.72) 100%
+            ),
+            radial-gradient(circle at 18% 22%, rgba(255,255,255,0.35) 0 2px, transparent 3px 15px),
+            radial-gradient(circle at 70% 38%, rgba(255,255,255,0.25) 0 2px, transparent 3px 18px),
+            linear-gradient(180deg, #6EDAF0 0%, #21A7D0 48%, #087CAD 100%);
+        background-size: 100% 100%, 32px 24px, 38px 29px, 100% 100%;
+        transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+    }
+
+    .pool-lane::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        background:
+            linear-gradient(180deg,
+                rgba(5,43,68,0.88) 0%,
+                rgba(10,108,159,0.75) 52%,
+                rgba(34,184,207,0.58) 100%
+            );
+        transform: scaleY(0);
+        transform-origin: top;
+        transition: transform 0.34s ease;
+    }
+
+    .pool-lane::after {
+        content: "🏊";
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        z-index: 3;
+        font-size: 25px;
+        opacity: 0;
+        transform: translateX(-50%) translateY(-35px) rotate(90deg);
+        transition:
+            transform 0.58s cubic-bezier(.2,.85,.2,1),
+            opacity 0.18s ease;
+        filter: drop-shadow(0 4px 6px rgba(5,43,68,0.35));
+    }
+
+    .pool-lane:hover {
+        transform: translateY(-4px);
+        border-color: #FFFFFF;
+        box-shadow:
+            inset 3px 0 0 rgba(255,255,255,0.86),
+            inset -3px 0 0 rgba(255,255,255,0.86),
+            0 16px 32px rgba(5,43,68,0.20);
+    }
+
+    .pool-lane:hover::before {
+        transform: scaleY(1);
+    }
+
+    .pool-lane:hover::after {
+        opacity: 1;
+        transform: translateX(-50%) translateY(56px) rotate(90deg);
+    }
+
+    .pool-lane.active {
+        border: 2px solid #D6A937;
+        box-shadow:
+            inset 3px 0 0 rgba(255,255,255,0.90),
+            inset -3px 0 0 rgba(255,255,255,0.90),
+            0 16px 34px rgba(214,169,55,0.28);
+    }
+
+    .pool-lane.active::before {
+        transform: scaleY(1);
+        background:
+            linear-gradient(180deg,
+                rgba(5,43,68,0.94) 0%,
+                rgba(10,108,159,0.84) 55%,
+                rgba(214,169,55,0.68) 100%
+            );
+    }
+
+    .pool-lane.active::after {
+        content: "🏊";
+        opacity: 1;
+        transform: translateX(-50%) translateY(56px) rotate(90deg);
+    }
+
+    .lane-number,
+    .lane-label,
+    .lane-tag {
+        position: relative;
+        z-index: 2;
+        display: block;
+        text-shadow: 0 2px 8px rgba(5,43,68,0.34);
+    }
+
+    .lane-number {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.88;
+        margin-bottom: 4px;
+    }
+
+    .lane-label {
+        font-size: 15px;
+        font-weight: 900;
+        line-height: 1.05;
+    }
+
+    .lane-tag {
+        font-size: 10.5px;
+        font-weight: 650;
+        opacity: 0.86;
+        margin-top: 5px;
+        line-height: 1.15;
+    }
+
+    .current-lane {
+        margin-top: 12px;
+        color: #52616B;
+        font-size: 13px;
+        text-align: center;
+        font-weight: 600;
+    }
+
+    .current-lane b {
+        color: #052B44;
+    }
+
+    @media (max-width: 1150px) {
+        .pool-grid {
+            grid-template-columns: repeat(4, minmax(120px, 1fr));
+        }
+
+        .pool-lane {
+            min-height: 92px;
+        }
+    }
+
+    @media (max-width: 650px) {
+        .pool-nav-top {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .pool-subtitle {
+            text-align: left;
+        }
+
+        .pool-grid {
+            grid-template-columns: repeat(2, minmax(120px, 1fr));
+        }
+    }
+    
     </style>
     """,
     unsafe_allow_html=True
@@ -630,34 +859,87 @@ if missing_files:
 
 
 # ============================================================
-# SIDEBAR NAVIGATION
+# TOP NAVIGATION - SWIMMING POOL LANES
 # ============================================================
 
-st.sidebar.markdown("## 🏊 Swim Records Explorer")
-st.sidebar.markdown(
-    """
-    A fan-oriented archive combining  
-    **world record history** and  
-    **all-time top performances**.
-    """
+PAGES = [
+    "Home",
+    "World Record Timeline",
+    "Current World Records",
+    "All-Time Top 200 Rankings",
+    "Athletes Hall of Fame",
+    "Nations & Places",
+    "Compare Events",
+    "Data & Methods"
+]
+
+PAGE_LABELS = {
+    "Home": "Home",
+    "World Record Timeline": "Timeline",
+    "Current World Records": "Records",
+    "All-Time Top 200 Rankings": "Top 200",
+    "Athletes Hall of Fame": "Athletes",
+    "Nations & Places": "Nations",
+    "Compare Events": "Compare",
+    "Data & Methods": "Methods"
+}
+
+PAGE_TAGS = {
+    "Home": "Start block",
+    "World Record Timeline": "Record flow",
+    "Current World Records": "Gold lane",
+    "All-Time Top 200 Rankings": "Elite depth",
+    "Athletes Hall of Fame": "Legends",
+    "Nations & Places": "Maps & flags",
+    "Compare Events": "Race match",
+    "Data & Methods": "Behind data"
+}
+
+# Read selected page from the URL.
+# Example: ?page=World%20Record%20Timeline
+query_page = st.query_params.get("page", "Home")
+
+if isinstance(query_page, list):
+    query_page = query_page[0]
+
+page = query_page if query_page in PAGES else "Home"
+
+# Build the lane buttons as ONE compact HTML string.
+# Important: no multi-line indented HTML here, otherwise Streamlit may print it as code.
+nav_items = ""
+
+for i, page_name in enumerate(PAGES, start=1):
+    active_class = " active" if page == page_name else ""
+    page_url = quote(page_name, safe="")
+
+    nav_items += (
+        f'<a class="pool-lane{active_class}" href="?page={page_url}">'
+        f'<span class="lane-number">Lane {i}</span>'
+        f'<span class="lane-label">{PAGE_LABELS[page_name]}</span>'
+        f'<span class="lane-tag">{PAGE_TAGS[page_name]}</span>'
+        f'</a>'
+    )
+
+nav_html = (
+    '<div class="pool-nav-shell">'
+    '<div class="pool-nav-top">'
+    '<div class="pool-brand">🏊 Swim Records Explorer</div>'
+    '<div class="pool-subtitle">'
+    'Select a lane to dive into swimming records, rankings, athletes and nations.'
+    '</div>'
+    '</div>'
+    f'<div class="pool-grid">{nav_items}</div>'
+    f'<div class="current-lane">Current lane: <b>{PAGE_LABELS[page]}</b></div>'
+    '</div>'
 )
 
-page = st.sidebar.radio(
-    "Navigation",
-    [
-        "Home",
-        "World Record Timeline",
-        "Current World Records",
-        "All-Time Top 200 Rankings",
-        "Athletes Hall of Fame",
-        "Nations & Places",
-        "Compare Events",
-        "Data & Methods"
-    ]
-)
+st.markdown(nav_html, unsafe_allow_html=True)
 
-st.sidebar.markdown("---")
-st.sidebar.caption("Gold = current record / best performance. Blue = long course. Aqua = short course.")
+with st.sidebar:
+    st.markdown("## 🏊 Filters")
+    st.caption("Use this panel only when a page requires filtering.")
+    st.markdown("---")
+    st.caption("Gold = current record / best performance. Blue = long course. Aqua = short course.")
 
 
 # ============================================================
