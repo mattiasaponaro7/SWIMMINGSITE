@@ -65,9 +65,24 @@ GENDER_COLORS = {
 st.markdown(
     """
     <style>
-    .main {
-        background-color: #F7FBFD;
-    }
+.stApp {
+    background-color: #F7FBFD;
+    color: #052B44;
+}
+
+.main {
+    background-color: #F7FBFD;
+    color: #052B44;
+}
+
+[data-testid="stAppViewContainer"] {
+    background-color: #F7FBFD;
+    color: #052B44;
+}
+
+[data-testid="stMarkdownContainer"] {
+    color: #052B44;
+}
 
     .hero {
         padding: 34px 38px;
@@ -574,22 +589,57 @@ def plotly_clean_layout(fig, height=480, title=None):
 
     fig.update_layout(
         height=height,
-        title_font=dict(size=22, color=NAVY),
-        font=dict(family="Arial", size=13, color=NAVY),
+        font=dict(
+            family="Arial",
+            size=13,
+            color=NAVY
+        ),
+        title=dict(
+            font=dict(size=22, color=NAVY),
+            x=0.02,
+            xanchor="left"
+        ),
         paper_bgcolor="white",
         plot_bgcolor="white",
-        margin=dict(l=30, r=30, t=80, b=40),
+        margin=dict(l=45, r=35, t=85, b=55),
         legend=dict(
             orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            font=dict(color=NAVY, size=12)
+        ),
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=13,
+            font_color=NAVY
         )
     )
 
-    fig.update_xaxes(showgrid=True, gridcolor="#E7EEF2", zeroline=False)
-    fig.update_yaxes(showgrid=True, gridcolor="#E7EEF2", zeroline=False)
+    fig.update_xaxes(
+        showgrid=True,
+        gridcolor="#DDEAF0",
+        zeroline=False,
+        title_font=dict(color=NAVY, size=14),
+        tickfont=dict(color=NAVY, size=12),
+        linecolor=NAVY,
+        color=NAVY
+    )
+
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor="#DDEAF0",
+        zeroline=False,
+        title_font=dict(color=NAVY, size=14),
+        tickfont=dict(color=NAVY, size=12),
+        linecolor=NAVY,
+        color=NAVY
+    )
+
+    fig.update_traces(
+        textfont=dict(color=NAVY, size=11)
+    )
 
     return fig
 
@@ -1035,8 +1085,10 @@ if page == "Home":
 
         fig.update_traces(
             textposition="outside",
+            textfont=dict(color=NAVY, size=9),
             marker_line_color="white",
-            marker_line_width=0.8
+            marker_line_width=0.8,
+            cliponaxis=False
         )
 
         fig.update_xaxes(
@@ -1083,8 +1135,10 @@ if page == "Home":
 
         fig.update_traces(
             textposition="outside",
+            textfont=dict(color=NAVY, size=12),
             marker_line_color="white",
-            marker_line_width=0.8
+            marker_line_width=0.8,
+            cliponaxis=False
         )
 
         fig.update_layout(
@@ -1113,8 +1167,8 @@ if page == "Home":
         )
 
     section(
-        "How to read this app",
-        "Use the sidebar to move across the story: first the record timeline, then current records, then all-time rankings, athletes and nations."
+    "How to read this app",
+    "Use the swimming-pool lanes at the top of the page to move across the story: first the record timeline, then current records, then all-time rankings, athletes and nations."
     )
 
     st.markdown(
