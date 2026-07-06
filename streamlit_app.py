@@ -1,4 +1,7 @@
 import re
+import random
+import unicodedata
+from difflib import get_close_matches
 from pathlib import Path
 from urllib.parse import quote
 
@@ -418,6 +421,144 @@ st.markdown(
         }
     }
     
+/* ============================================================
+   SWIM RECORD TOE - GAME STYLE
+============================================================ */
+
+.game-hero {
+    padding: 34px 38px;
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at 15% 18%, rgba(255,255,255,0.36) 0 3px, transparent 4px 28px),
+        radial-gradient(circle at 72% 35%, rgba(255,255,255,0.26) 0 3px, transparent 4px 30px),
+        linear-gradient(135deg, #052B44 0%, #087CAD 48%, #22B8CF 100%);
+    color: white;
+    margin-bottom: 26px;
+    box-shadow: 0 12px 34px rgba(5,43,68,0.18);
+}
+
+.game-hero h1 {
+    font-size: 48px;
+    font-weight: 900;
+    margin-bottom: 8px;
+}
+
+.game-hero p {
+    font-size: 18px;
+    max-width: 980px;
+    line-height: 1.45;
+    opacity: 0.96;
+}
+
+.game-rules {
+    background: white;
+    border-radius: 22px;
+    padding: 20px 24px;
+    border: 1px solid #D8ECF4;
+    box-shadow: 0 8px 24px rgba(5,43,68,0.07);
+    margin-bottom: 18px;
+    color: #052B44;
+}
+
+.game-rules b {
+    color: #052B44;
+}
+
+.game-turn-card {
+    background: linear-gradient(135deg, #FFFFFF 0%, #E8F8FB 100%);
+    border: 1px solid #D8ECF4;
+    border-radius: 22px;
+    padding: 18px 22px;
+    box-shadow: 0 8px 24px rgba(5,43,68,0.07);
+    color: #052B44;
+    font-size: 18px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.game-axis-label {
+    background: #052B44;
+    color: white;
+    border-radius: 16px;
+    padding: 12px 10px;
+    text-align: center;
+    font-weight: 850;
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.15;
+    box-shadow: 0 8px 18px rgba(5,43,68,0.12);
+}
+
+.game-row-label {
+    background: linear-gradient(135deg, #0A6C9F 0%, #22B8CF 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 12px 10px;
+    text-align: center;
+    font-weight: 850;
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.15;
+    box-shadow: 0 8px 18px rgba(5,43,68,0.10);
+}
+
+.game-empty-corner {
+    background: transparent;
+    min-height: 64px;
+}
+
+.game-answer-box {
+    background-color: white;
+    border-left: 7px solid #22B8CF;
+    border-radius: 20px;
+    padding: 18px 22px;
+    margin-top: 22px;
+    box-shadow: 0 8px 24px rgba(5,43,68,0.07);
+    color: #052B44;
+}
+
+.game-answer-box b {
+    color: #052B44;
+}
+
+/* Streamlit game buttons */
+div[data-testid="stButton"] button {
+    border-radius: 18px;
+    border: 2px solid rgba(10,108,159,0.22);
+    background:
+        linear-gradient(90deg,
+            rgba(255,255,255,0.72) 0px,
+            rgba(255,255,255,0.72) 2px,
+            transparent 2px,
+            transparent calc(100% - 2px),
+            rgba(255,255,255,0.72) calc(100% - 2px),
+            rgba(255,255,255,0.72) 100%
+        ),
+        linear-gradient(135deg, #E8F8FB 0%, #BDEFFA 48%, #6EDAF0 100%);
+    color: #052B44;
+    font-weight: 900;
+    min-height: 66px;
+    box-shadow: 0 8px 20px rgba(5,43,68,0.09);
+    transition: 0.2s ease;
+}
+
+div[data-testid="stButton"] button:hover {
+    border-color: #0A6C9F;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(5,43,68,0.16);
+}
+
+div[data-testid="stButton"] button:disabled {
+    background: #E4EEF3;
+    color: #52616B;
+    border-color: #D8ECF4;
+    box-shadow: none;
+}
+    
     </style>
     """,
     unsafe_allow_html=True
@@ -717,6 +858,214 @@ def apply_common_filters(df, gender=True, course=True, stroke=True, distance=Tru
 
     return filtered
 
+# ============================================================
+# GAME FUNCTIONS - SWIM RECORD TOE
+# ============================================================
+
+def normalize_answer(value):
+    """Normalize swimmer names for robust answer checking."""
+    value = clean_text(value).lower()
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    value = re.sub(r"[^a-z0-9\s]", "", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
+def prepare_swim_game_data(df):
+    """Prepare world record data for the tic-tac-toe quiz."""
+    game_df = df.copy()
+
+    game_df = game_df[game_df["name"].astype(str).str.strip() != ""].copy()
+    game_df = game_df[game_df["event_label"].astype(str).str.strip() != ""].copy()
+
+    # Place criterion: location first, meet as fallback.
+    game_df["record_place"] = game_df["location"].astype(str).apply(clean_text)
+
+    if "meet" in game_df.columns:
+        game_df.loc[game_df["record_place"] == "", "record_place"] = (
+            game_df.loc[game_df["record_place"] == "", "meet"]
+            .astype(str)
+            .apply(clean_text)
+        )
+
+    game_df.loc[game_df["record_place"] == "", "record_place"] = "Unknown place"
+
+    # Decade criterion.
+    game_df["year_numeric"] = pd.to_numeric(game_df["year"], errors="coerce")
+    game_df["decade"] = np.where(
+        game_df["year_numeric"].notna(),
+        ((game_df["year_numeric"] // 10) * 10).astype("Int64").astype(str) + "s",
+        "Unknown decade"
+    )
+
+    # Compact event criterion, useful if event_label is too specific.
+    game_df["event_family"] = (
+        game_df["distance"].astype(str)
+        + "m "
+        + game_df["stroke"].astype(str)
+    )
+
+    # Remove empty/useless criteria.
+    for col in ["record_place", "nationality", "decade", "course", "event_label", "event_family"]:
+        if col in game_df.columns:
+            game_df[col] = game_df[col].astype(str).apply(clean_text)
+            game_df = game_df[game_df[col] != ""]
+            game_df = game_df[game_df[col] != "Unknown"]
+
+    return game_df
+
+
+def build_swim_game_grid(game_df, row_col, col_col, attempts=1500):
+    """
+    Build a 3x3 grid.
+    It tries to find rows and columns where every intersection has at least one valid swimmer.
+    """
+    pair_counts = (
+        game_df
+        .dropna(subset=[row_col, col_col, "name"])
+        .groupby([row_col, col_col])["name"]
+        .nunique()
+        .reset_index(name="valid_answers")
+    )
+
+    if pair_counts.empty:
+        return [], [], 0
+
+    # Use the most connected values to avoid impossible boards.
+    candidate_rows = (
+        pair_counts.groupby(row_col)["valid_answers"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(35)
+        .index
+        .tolist()
+    )
+
+    candidate_cols = (
+        pair_counts.groupby(col_col)["valid_answers"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(35)
+        .index
+        .tolist()
+    )
+
+    if len(candidate_rows) < 3 or len(candidate_cols) < 3:
+        return [], [], 0
+
+    best_rows = None
+    best_cols = None
+    best_score = -1
+
+    for _ in range(attempts):
+        rows = random.sample(candidate_rows, 3)
+        cols = random.sample(candidate_cols, 3)
+
+        score = 0
+        for r in rows:
+            for c in cols:
+                exists = (
+                    (pair_counts[row_col] == r)
+                    & (pair_counts[col_col] == c)
+                ).any()
+                if exists:
+                    score += 1
+
+        if score > best_score:
+            best_rows = rows
+            best_cols = cols
+            best_score = score
+
+        if score == 9:
+            break
+
+    return best_rows, best_cols, best_score
+
+
+def get_cell_answers(game_df, row_value, col_value, row_col, col_col):
+    """Return all valid swimmers for a specific grid cell."""
+    cell_df = game_df[
+        (game_df[row_col].astype(str) == str(row_value))
+        & (game_df[col_col].astype(str) == str(col_value))
+    ].copy()
+
+    answers = (
+        cell_df["name"]
+        .dropna()
+        .astype(str)
+        .apply(clean_text)
+        .drop_duplicates()
+        .sort_values()
+        .tolist()
+    )
+
+    return answers
+
+
+def validate_swim_answer(game_df, answer, row_value, col_value, row_col, col_col):
+    """Check whether the submitted swimmer is valid for the selected cell."""
+    valid_answers = get_cell_answers(game_df, row_value, col_value, row_col, col_col)
+
+    if not valid_answers:
+        return False, None, []
+
+    normalized_map = {
+        normalize_answer(name): name
+        for name in valid_answers
+    }
+
+    user_norm = normalize_answer(answer)
+
+    if user_norm in normalized_map:
+        return True, normalized_map[user_norm], valid_answers
+
+    close = get_close_matches(
+        user_norm,
+        list(normalized_map.keys()),
+        n=1,
+        cutoff=0.84
+    )
+
+    if close:
+        return True, normalized_map[close[0]], valid_answers
+
+    return False, None, valid_answers
+
+
+def check_swim_game_winner(board):
+    """Return winner symbol, Draw, or None."""
+    lines = []
+
+    lines.extend(board)
+    lines.extend([[board[0][j], board[1][j], board[2][j]] for j in range(3)])
+    lines.append([board[0][0], board[1][1], board[2][2]])
+    lines.append([board[0][2], board[1][1], board[2][0]])
+
+    for line in lines:
+        if line[0] != "" and line[0] == line[1] == line[2]:
+            return line[0]
+
+    if all(board[i][j] != "" for i in range(3) for j in range(3)):
+        return "Draw"
+
+    return None
+
+
+def reset_swim_record_toe(game_df, row_col, col_col):
+    rows, cols, score = build_swim_game_grid(game_df, row_col, col_col)
+
+    st.session_state.swim_toe_rows = rows
+    st.session_state.swim_toe_cols = cols
+    st.session_state.swim_toe_score = score
+    st.session_state.swim_toe_board = [["" for _ in range(3)] for _ in range(3)]
+    st.session_state.swim_toe_answers = [["" for _ in range(3)] for _ in range(3)]
+    st.session_state.swim_toe_turn = "❌"
+    st.session_state.swim_toe_winner = None
+    st.session_state.swim_toe_selected = None
+    st.session_state.swim_toe_used_names = []
+    st.session_state.swim_toe_feedback = ""
+
 
 # ============================================================
 # DATA LOADING
@@ -929,34 +1278,34 @@ if missing_files:
 PAGES = [
     "Home",
     "World Record Timeline",
-    "Current World Records",
     "All-Time Top 200 Rankings",
     "Athletes Hall of Fame",
     "Nations & Places",
     "Compare Events",
-    "Data & Methods"
+    "Data & Methods",
+    "Swim Record Toe"
 ]
 
 PAGE_LABELS = {
     "Home": "Home",
     "World Record Timeline": "Timeline",
-    "Current World Records": "Records",
     "All-Time Top 200 Rankings": "Top 200",
     "Athletes Hall of Fame": "Athletes",
     "Nations & Places": "Nations",
     "Compare Events": "Compare",
-    "Data & Methods": "Methods"
+    "Data & Methods": "Methods",
+    "Swim Record Toe": "Game"
 }
 
 PAGE_TAGS = {
     "Home": "Start block",
     "World Record Timeline": "Record flow",
-    "Current World Records": "Gold lane",
     "All-Time Top 200 Rankings": "Elite depth",
     "Athletes Hall of Fame": "Legends",
     "Nations & Places": "Maps & flags",
     "Compare Events": "Race match",
-    "Data & Methods": "Behind data"
+    "Data & Methods": "Behind data",
+    "Swim Record Toe": "Quiz lane"
 }
 
 # Read selected page from the URL.
@@ -1312,101 +1661,9 @@ elif page == "World Record Timeline":
     )
 
 
-# ============================================================
-# PAGE 3 - CURRENT WORLD RECORDS
-# ============================================================
-
-elif page == "Current World Records":
-
-    section(
-        "Current World Records",
-        "A clean overview of the records that currently define the limit of swimming performance."
-    )
-
-    current = wr[wr["is_current_bool"] == True].copy()
-
-    filtered = apply_common_filters(
-        current,
-        gender=True,
-        course=True,
-        stroke=True,
-        distance=True,
-        key_prefix="current"
-    )
-
-    if filtered.empty:
-        st.warning("No current records available for the selected filters.")
-        st.stop()
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-        st.metric("Current records shown", len(filtered))
-
-    with c2:
-        st.metric("Athletes", filtered["name"].nunique())
-
-    with c3:
-        st.metric("Nations", filtered["nationality"].nunique())
-
-    with c4:
-        newest_year = int(filtered["year"].max()) if filtered["year"].notna().any() else "-"
-        st.metric("Most recent record year", newest_year)
-
-    st.markdown(
-        """
-        <div class="warning-box">
-        Direct time comparison across different distances is not analytically fair.
-        Use filters to compare similar events, or read this page as a lookup view of current records.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    display = filtered.copy()
-    display["label"] = display["event_label"] + " — " + display["name"]
-
-    fig = px.bar(
-        display.sort_values("seconds", ascending=True),
-        x="seconds",
-        y="label",
-        orientation="h",
-        color="gender",
-        color_discrete_map=GENDER_COLORS,
-        hover_data=["time", "nationality", "meet", "location", "date"],
-        title="Current world records selected"
-    )
-    fig.update_layout(yaxis=dict(autorange="reversed"))
-    fig.update_xaxes(title="Time in seconds")
-    fig.update_yaxes(title="")
-    fig = plotly_clean_layout(fig, height=max(420, 26 * len(display)))
-    st.plotly_chart(fig, use_container_width=True)
-
-    table_cols = [
-        "event_label", "time", "seconds", "name", "nationality",
-        "date", "meet", "location"
-    ]
-
-    st.dataframe(
-        filtered[table_cols].rename(
-            columns={
-                "event_label": "Event",
-                "time": "Time",
-                "seconds": "Seconds",
-                "name": "Athlete",
-                "nationality": "Nationality",
-                "date": "Date",
-                "meet": "Meet",
-                "location": "Location"
-            }
-        ),
-        use_container_width=True,
-        hide_index=True
-    )
-
 
 # ============================================================
-# PAGE 4 - ALL-TIME TOP 200 RANKINGS
+# PAGE 3 - ALL-TIME TOP 200 RANKINGS
 # ============================================================
 
 elif page == "All-Time Top 200 Rankings":
@@ -1564,7 +1821,7 @@ elif page == "All-Time Top 200 Rankings":
 
 
 # ============================================================
-# PAGE 5 - ATHLETES HALL OF FAME
+# PAGE 4 - ATHLETES HALL OF FAME
 # ============================================================
 
 elif page == "Athletes Hall of Fame":
@@ -1746,7 +2003,7 @@ elif page == "Athletes Hall of Fame":
 
 
 # ============================================================
-# PAGE 6 - NATIONS & PLACES
+# PAGE 5 - NATIONS & PLACES
 # ============================================================
 
 elif page == "Nations & Places":
@@ -1882,7 +2139,7 @@ elif page == "Nations & Places":
 
 
 # ============================================================
-# PAGE 7 - COMPARE EVENTS
+# PAGE 6 - COMPARE EVENTS
 # ============================================================
 
 elif page == "Compare Events":
@@ -2043,7 +2300,7 @@ elif page == "Compare Events":
 
 
 # ============================================================
-# PAGE 8 - DATA & METHODS
+# PAGE 7 - DATA & METHODS
 # ============================================================
 
 elif page == "Data & Methods":
@@ -2151,3 +2408,350 @@ elif page == "Data & Methods":
 
     with st.expander("Top performances raw preview"):
         st.dataframe(top.head(100), use_container_width=True)
+
+        
+        
+# ============================================================
+# PAGE 8 - SWIM RECORD TOE
+# ============================================================
+
+elif page == "Swim Record Toe":
+
+    st.markdown(
+        """
+        <div class="game-hero">
+            <h1>Swim Record Toe</h1>
+            <p>
+            A swimming version of tic-tac-toe: choose a square, connect the row and column criteria,
+            then type or select the swimmer who really set a world record matching both conditions.
+            Claim three lanes in a row to win.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div class="game-rules">
+        <b>How to play:</b><br>
+        1. Choose a free square in the pool grid.<br>
+        2. Look at the row and column criteria.<br>
+        3. Write the swimmer name or choose it from the dropdown.<br>
+        4. If the answer exists in the world record dataset, you claim the lane with ❌ or ⭕.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    game_df = prepare_swim_game_data(wr)
+
+    if game_df.empty:
+        st.error("The game cannot start because the world record dataset has no usable swimmer names.")
+        st.stop()
+
+    row_options = {
+        "Specific event": "event_label",
+        "Event family": "event_family",
+        "Stroke": "stroke",
+        "Gender": "gender"
+    }
+
+    col_options = {
+        "Record location / pool": "record_place",
+        "Nationality": "nationality",
+        "Decade": "decade",
+        "Course": "course"
+    }
+
+    c_setup_1, c_setup_2, c_setup_3 = st.columns([1, 1, 0.7])
+
+    with c_setup_1:
+        row_label = st.selectbox(
+            "Rows define",
+            list(row_options.keys()),
+            index=0,
+            key="swim_toe_row_label"
+        )
+
+    with c_setup_2:
+        col_label = st.selectbox(
+            "Columns define",
+            list(col_options.keys()),
+            index=0,
+            key="swim_toe_col_label"
+        )
+
+    row_col = row_options[row_label]
+    col_col = col_options[col_label]
+
+    with c_setup_3:
+        st.write("")
+        st.write("")
+        new_game = st.button("New game", use_container_width=True)
+
+    state_missing = (
+        "swim_toe_board" not in st.session_state
+        or "swim_toe_rows" not in st.session_state
+        or "swim_toe_cols" not in st.session_state
+    )
+
+    axes_changed = (
+        st.session_state.get("swim_toe_row_col") != row_col
+        or st.session_state.get("swim_toe_col_col") != col_col
+    )
+
+    if state_missing or axes_changed or new_game:
+        st.session_state.swim_toe_row_col = row_col
+        st.session_state.swim_toe_col_col = col_col
+        reset_swim_record_toe(game_df, row_col, col_col)
+
+    rows = st.session_state.swim_toe_rows
+    cols = st.session_state.swim_toe_cols
+    board = st.session_state.swim_toe_board
+
+    if not rows or not cols:
+        st.warning("Not enough data to build a 3x3 game board with these criteria. Try another row or column setting.")
+        st.stop()
+
+    if st.session_state.swim_toe_score < 9:
+        st.warning(
+            "This board contains one or more very difficult cells. "
+            "Try another New game or switch from location to nationality/decade for an easier board."
+        )
+
+    c_turn_1, c_turn_2, c_turn_3 = st.columns(3)
+
+    with c_turn_1:
+        st.markdown(
+            f"""
+            <div class="game-turn-card">
+            Current turn<br>
+            <span style="font-size:34px;">{st.session_state.swim_toe_turn}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c_turn_2:
+        claimed = sum(
+            1 for i in range(3) for j in range(3)
+            if st.session_state.swim_toe_board[i][j] != ""
+        )
+        st.markdown(
+            f"""
+            <div class="game-turn-card">
+            Claimed lanes<br>
+            <span style="font-size:34px;">{claimed}/9</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c_turn_3:
+        if st.session_state.swim_toe_winner is None:
+            status_text = "Race still open"
+        elif st.session_state.swim_toe_winner == "Draw":
+            status_text = "Draw"
+        else:
+            status_text = f"{st.session_state.swim_toe_winner} wins"
+
+        st.markdown(
+            f"""
+            <div class="game-turn-card">
+            Status<br>
+            <span style="font-size:25px;">{status_text}</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown("")
+
+    # Header row
+    header_cols = st.columns(4)
+    header_cols[0].markdown("<div class='game-empty-corner'></div>", unsafe_allow_html=True)
+
+    for j in range(3):
+        header_cols[j + 1].markdown(
+            f"<div class='game-axis-label'>{cols[j]}</div>",
+            unsafe_allow_html=True
+        )
+
+    # Game grid
+    for i in range(3):
+        grid_cols = st.columns(4)
+
+        grid_cols[0].markdown(
+            f"<div class='game-row-label'>{rows[i]}</div>",
+            unsafe_allow_html=True
+        )
+
+        for j in range(3):
+            current_mark = board[i][j]
+            valid_answers = get_cell_answers(game_df, rows[i], cols[j], row_col, col_col)
+
+            if current_mark != "":
+                label = f"{current_mark}\n{st.session_state.swim_toe_answers[i][j]}"
+                disabled = True
+            elif not valid_answers:
+                label = "No data"
+                disabled = True
+            else:
+                label = "Dive in"
+
+                if st.session_state.swim_toe_selected == (i, j):
+                    label = "Selected"
+
+                disabled = st.session_state.swim_toe_winner is not None
+
+            if grid_cols[j + 1].button(
+                label,
+                key=f"swim_toe_cell_{i}_{j}",
+                use_container_width=True,
+                disabled=disabled
+            ):
+                st.session_state.swim_toe_selected = (i, j)
+                st.session_state.swim_toe_feedback = ""
+                st.rerun()
+
+    winner = st.session_state.swim_toe_winner
+
+    if winner is not None:
+        if winner == "Draw":
+            st.success("The race ends in a draw. No more free lanes.")
+        else:
+            st.success(f"{winner} wins the pool battle!")
+
+    selected = st.session_state.swim_toe_selected
+
+    if selected is not None and st.session_state.swim_toe_winner is None:
+
+        i, j = selected
+        row_value = rows[i]
+        col_value = cols[j]
+
+        valid_answers = get_cell_answers(game_df, row_value, col_value, row_col, col_col)
+
+        st.markdown(
+            f"""
+            <div class="game-answer-box">
+            <b>Selected square:</b> {row_value} × {col_value}<br>
+            Write the swimmer manually or choose a name from the dropdown.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        all_swimmers = (
+            game_df["name"]
+            .dropna()
+            .astype(str)
+            .apply(clean_text)
+            .drop_duplicates()
+            .sort_values()
+            .tolist()
+        )
+
+        c_ans_1, c_ans_2 = st.columns(2)
+
+        with c_ans_1:
+            typed_answer = st.text_input(
+                "Write swimmer name",
+                placeholder="Example: Michael Phelps",
+                key=f"typed_answer_{i}_{j}"
+            )
+
+        with c_ans_2:
+            dropdown_answer = st.selectbox(
+                "Or choose swimmer from dropdown",
+                [""] + all_swimmers,
+                index=0,
+                key=f"dropdown_answer_{i}_{j}"
+            )
+
+        answer_to_check = typed_answer.strip() if typed_answer.strip() else dropdown_answer.strip()
+
+        c_submit_1, c_submit_2, c_submit_3 = st.columns([1, 1, 1])
+
+        with c_submit_1:
+            submit_answer = st.button("Submit answer", use_container_width=True)
+
+        with c_submit_2:
+            clear_selection = st.button("Cancel selection", use_container_width=True)
+
+        with c_submit_3:
+            reveal_hint = st.button("Small hint", use_container_width=True)
+
+        if clear_selection:
+            st.session_state.swim_toe_selected = None
+            st.session_state.swim_toe_feedback = ""
+            st.rerun()
+
+        if reveal_hint:
+            if valid_answers:
+                st.info(f"Hint: there are {len(valid_answers)} valid swimmer(s) for this square.")
+            else:
+                st.warning("No valid swimmer exists for this square in the dataset.")
+
+        if submit_answer:
+            if answer_to_check == "":
+                st.warning("Write or select a swimmer before submitting.")
+            elif normalize_answer(answer_to_check) in st.session_state.swim_toe_used_names:
+                st.warning("This swimmer has already been used in this game. Try another name.")
+            else:
+                is_correct, matched_name, possible_answers = validate_swim_answer(
+                    game_df,
+                    answer_to_check,
+                    row_value,
+                    col_value,
+                    row_col,
+                    col_col
+                )
+
+                if is_correct:
+                    st.session_state.swim_toe_board[i][j] = st.session_state.swim_toe_turn
+                    st.session_state.swim_toe_answers[i][j] = matched_name
+                    st.session_state.swim_toe_used_names.append(normalize_answer(matched_name))
+
+                    new_winner = check_swim_game_winner(st.session_state.swim_toe_board)
+                    st.session_state.swim_toe_winner = new_winner
+
+                    if new_winner is None:
+                        st.session_state.swim_toe_turn = "⭕" if st.session_state.swim_toe_turn == "❌" else "❌"
+
+                    st.session_state.swim_toe_selected = None
+                    st.success(f"Correct! {matched_name} claims the lane.")
+                    st.rerun()
+
+                else:
+                    st.error("Wrong answer for this square. Try again.")
+
+                    with st.expander("Show possible valid answers for this square"):
+                        if possible_answers:
+                            st.write(", ".join(possible_answers[:20]))
+                        else:
+                            st.write("No valid answers available in the dataset.")
+
+    st.markdown("---")
+
+    with st.expander("Used swimmers in this game"):
+        if st.session_state.swim_toe_used_names:
+            shown_used = [
+                st.session_state.swim_toe_answers[i][j]
+                for i in range(3)
+                for j in range(3)
+                if st.session_state.swim_toe_answers[i][j] != ""
+            ]
+            st.write(", ".join(shown_used))
+        else:
+            st.write("No swimmer used yet.")
+
+    with st.expander("Why this game belongs in the app"):
+        st.markdown(
+            """
+            This game turns passive exploration into active recall.
+            After browsing the records, users can test whether they remember the links between
+            swimmers, events, places and historical record moments.
+            """
+        )
