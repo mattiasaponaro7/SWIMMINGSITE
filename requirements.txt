@@ -1,6 +1,5 @@
 streamlit
 pandas
-openpyxl
+numpy
 plotly
-
-python -m streamlit run streamlit_app.py
+openpyxl
