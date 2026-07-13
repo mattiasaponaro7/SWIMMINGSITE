@@ -1,0 +1,4909 @@
+import re
+<<<<<<< HEAD
+import base64
+import random
+import unicodedata
+from difflib import get_close_matches
+=======
+>>>>>>> parent of 429c99e (gioco)
+from pathlib import Path
+from urllib.parse import quote
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
+
+
+# ============================================================
+# PAGE CONFIG
+# ============================================================
+
+st.set_page_config(
+    page_title="Esplora i record del nuoto",
+    page_icon="🏊",
+    layout="wide",
+    initial_sidebar_state="auto"
+)
+
+px.defaults.template = "plotly_white"
+
+
+# ============================================================
+# FILE PATHS
+# ============================================================
+
+TOP_FILE = Path("Swimming_database_REAL.xlsx")
+WR_FILE = Path("world_records_swimming.xlsx")
+
+
+# ============================================================
+# COLORS
+# ============================================================
+
+NAVY = "#052B44"
+BLUE = "#0A6C9F"
+AQUA = "#22B8CF"
+LIGHT_AQUA = "#E8F8FB"
+GOLD = "#D6A937"
+GREY = "#D9E2EC"
+DARK_GREY = "#52616B"
+RED = "#D64545"
+
+COURSE_COLORS = {
+    "LC": BLUE,
+    "SC": AQUA
+}
+
+GENDER_COLORS = {
+    "Men": BLUE,
+    "Women": "#C65BAA",
+    "Mixed": GOLD,
+    "Unknown": DARK_GREY
+}
+
+
+# ============================================================
+# CSS
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600;700;800&display=swap');
+
+    html, body, .stApp {
+        font-family: 'Barlow', system-ui, -apple-system, sans-serif;
+        color: #24343B;
+    }
+
+    .stApp { background-color: #E9F3F2; }
+    .main { background-color: transparent; }
+
+    .block-container { padding-top: 0.7rem; max-width: 1180px; }
+    header[data-testid="stHeader"] { background: transparent; }
+
+    .fullbleed {
+        position: relative;
+        left: 50%; right: 50%;
+        margin-left: -50vw; margin-right: -50vw;
+        width: 100vw;
+    }
+
+    .wave-rule {
+        height: 12px;
+        margin: 4px 0 12px 0;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='12'%3E%3Cpath d='M0 6 q11.25 -6 22.5 0 t22.5 0 t22.5 0 t22.5 0' fill='none' stroke='%230C4A5A' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x left center / 90px 12px;
+        opacity: 0.5;
+    }
+
+    /* ============================================================
+       SECTION HEADERS — bold condensed poster style (per the deck)
+    ============================================================ */
+
+    .section-title {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.006em;
+        line-height: 0.95;
+        color: #0C4A5A;
+        font-size: 42px;
+        margin-top: 12px;
+        margin-bottom: 8px;
+    }
+
+    .section-subtitle {
+        color: #5A7480;
+        font-size: 16.5px;
+        font-weight: 500;
+        max-width: 840px;
+        margin-bottom: 18px;
+        line-height: 1.55;
+    }
+
+    /* ============================================================
+       HOME TOP BAND — title + short description + doodles
+    ============================================================ */
+
+    .swim-band {
+        position: relative;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 24px;
+        background: #FBFEFE;
+        border: 1px solid #D8E9E8;
+        border-radius: 22px;
+        padding: 22px 30px;
+        margin: 4px 0 22px 0;
+        box-shadow: 0 18px 40px -28px rgba(12,74,90,0.5);
+    }
+
+    .swim-band-icon .brand-logo {
+        width: 56px; height: 56px;
+        filter: drop-shadow(0 8px 16px rgba(12,74,90,0.28));
+    }
+
+    .swim-band-title {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.01em;
+        line-height: 0.94;
+        font-size: 40px;
+        color: #0C4A5A;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .swim-sparkle { width: 22px; height: 22px; flex: none; }
+
+    .swim-band-desc {
+        margin-top: 8px;
+        font-size: 15px;
+        font-weight: 500;
+        color: #4A6470;
+        line-height: 1.5;
+        max-width: 720px;
+    }
+
+    .swim-band-waves {
+        width: 116px; height: 66px;
+        border-radius: 14px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='58' height='15'%3E%3Cpath d='M0 8 q7.25 -7 14.5 0 t14.5 0 t14.5 0 t14.5 0' fill='none' stroke='%230C4A5A' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E") repeat, #EAF6F5;
+        background-size: 58px 15px, 100% 100%;
+        border: 1px solid #D8E9E8;
+        box-shadow: inset 0 0 0 3px #FBFEFE;
+    }
+
+    @media (max-width: 850px) {
+        .swim-band { grid-template-columns: auto 1fr; padding: 18px 20px; }
+        .swim-band-waves { display: none; }
+        .swim-band-title { font-size: 30px; }
+    }
+
+    /* ============================================================
+       MINI POOL — the little pool used as header on inner pages
+    ============================================================ */
+
+    .mini-pool {
+        background: #FBFEFE;
+        border: 1px solid #D8E9E8;
+        border-radius: 22px;
+        padding: 14px 16px 16px 16px;
+        margin: 2px 0 24px 0;
+        box-shadow: 0 18px 40px -30px rgba(12,74,90,0.5);
+    }
+
+    .mini-pool-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin: 2px 6px 12px 6px;
+    }
+
+    .mini-pool-brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+    }
+
+    .mini-pool-brand .brand-logo { width: 30px; height: 30px; }
+
+    .mini-pool-brand span {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.01em;
+        font-size: 20px;
+        color: #0C4A5A;
+    }
+
+    .mini-pool-current {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #5A7480;
+    }
+
+    .mini-pool-current b { color: #0C4A5A; }
+
+    /* ============================================================
+       POOL LANES (full on Home, compact via .mini)
+    ============================================================ */
+
+    .home-lanes {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 0;
+        overflow: hidden;
+        background:
+            url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='130'%20height='44'%3E%3Cpath%20d='M0%2022%20Q16.25%2014%2032.5%2022%20T65%2022%20T97.5%2022%20T130%2022'%20fill='none'%20stroke='%23FFFFFF'%20stroke-opacity='0.12'%20stroke-width='2'%20stroke-linecap='round'/%3E%3C/svg%3E") repeat,
+            url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='220'%20height='74'%3E%3Cpath%20d='M0%2037%20Q27.5%2025%2055%2037%20T110%2037%20T165%2037%20T220%2037'%20fill='none'%20stroke='%23FFFFFF'%20stroke-opacity='0.07'%20stroke-width='3'%20stroke-linecap='round'/%3E%3C/svg%3E") repeat,
+            linear-gradient(180deg, #8FD0D6 0%, #2C8093 55%, #145A6B 100%);
+        background-size: 130px 44px, 220px 74px, 100% 100%;
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.30), inset 0 18px 44px rgba(5,40,50,0.18);
+        animation: home-water-drift 26s linear infinite;
+    }
+
+    .home-lanes.mini { border-radius: 16px; }
+
+    @keyframes home-water-drift {
+        from { background-position: 0 0, 0 0, 0 0; }
+        to   { background-position: 130px 44px, -220px 74px, 0 0; }
+    }
+
+    .home-lane {
+        position: relative;
+        display: block;
+        min-height: 62vh;
+        overflow: hidden;
+        text-decoration: none !important;
+        transition: background 0.25s ease;
+    }
+
+    .home-lanes.mini .home-lane { min-height: 116px; }
+
+    .home-lane:hover { background: rgba(255,255,255,0.08); }
+
+    .pool-rope {
+        position: absolute;
+        top: 0; bottom: 0;
+        width: 6px;
+        transform: translateX(-50%);
+        z-index: 2;
+        pointer-events: none;
+        background:
+            repeating-linear-gradient(180deg, #E45A63 0px 12px, transparent 12px 22px) center top / 4px 100% no-repeat,
+            linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.6)) center top / 1.5px 100% no-repeat;
+    }
+
+    .pool-rope:nth-of-type(1) { left: 12.5%; }
+    .pool-rope:nth-of-type(2) { left: 25%; }
+    .pool-rope:nth-of-type(3) { left: 37.5%; }
+    .pool-rope:nth-of-type(4) { left: 50%; }
+    .pool-rope:nth-of-type(5) { left: 62.5%; }
+    .pool-rope:nth-of-type(6) { left: 75%; }
+    .pool-rope:nth-of-type(7) { left: 87.5%; }
+
+    .hl-line {
+        position: absolute;
+        left: 50%; top: 12%; bottom: 5%;
+        width: 4px;
+        transform: translateX(-50%);
+        z-index: 1;
+        pointer-events: none;
+        background: rgba(5,40,50,0.16);
+        border-radius: 2px;
+    }
+
+    .hl-line::before, .hl-line::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 22px; height: 4px;
+        background: rgba(5,40,50,0.16);
+        border-radius: 2px;
+    }
+
+    .hl-line::before { top: 0; }
+    .hl-line::after { bottom: 0; }
+    .home-lanes.mini .hl-line { top: 8%; bottom: 6%; }
+
+    .hl-btn {
+        position: relative;
+        z-index: 3;
+        display: block;
+        margin: 16px 12px 0 12px;
+        padding: 12px 7px;
+        text-align: center;
+        background: rgba(255,255,255,0.92);
+        border: 1px solid rgba(255,255,255,0.9);
+        border-radius: 14px;
+        box-shadow: 0 12px 26px -14px rgba(5,40,50,0.5);
+        transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .home-lanes.mini .hl-btn { margin: 12px 6px 0 6px; padding: 8px 4px; border-radius: 11px; }
+
+    .hl-name {
+        display: block;
+        font-family: 'Anton', system-ui, sans-serif;
+        color: #0C4A5A;
+        font-size: 16px;
+        font-weight: 400;
+        text-transform: uppercase;
+        line-height: 1.05;
+        letter-spacing: 0.02em;
+    }
+
+    .home-lanes.mini .hl-name { font-size: 13px; }
+
+    .hl-tag {
+        display: block;
+        color: #5A7480;
+        font-size: 9.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-top: 5px;
+        line-height: 1.15;
+    }
+
+    .home-lanes.mini .hl-tag { font-size: 8px; margin-top: 3px; }
+
+    .home-lane:hover .hl-btn {
+        transform: translateY(-3px);
+        border-color: #C9A24B;
+        box-shadow: 0 18px 32px -14px rgba(5,40,50,0.55);
+    }
+
+    .home-lane.active .hl-btn { border-color: #C9A24B; }
+
+    .hl-num {
+        position: absolute;
+        bottom: 16px; left: 0; right: 0;
+        z-index: 1;
+        text-align: center;
+        font-family: 'Anton', system-ui, sans-serif;
+        font-size: 44px;
+        font-weight: 400;
+        line-height: 1;
+        color: rgba(255,255,255,0.34);
+        pointer-events: none;
+    }
+
+    .home-lanes.mini .hl-num { font-size: 26px; bottom: 8px; }
+
+    .home-lane::after {
+        content: "";
+        position: absolute;
+        top: 100%; left: 50%;
+        z-index: 4;
+        width: 40px; height: 62px;
+        background: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2044%2070'%3E%3Cg%20fill='none'%20stroke='%23FFFFFF'%20stroke-width='4.6'%20stroke-linecap='round'%3E%3Cpath%20d='M15%2020%20L12%204'%3E%3CanimateTransform%20attributeName='transform'%20type='rotate'%20values='-6%2015%2020%3B16%2015%2020%3B-6%2015%2020'%20dur='1s'%20repeatCount='indefinite'/%3E%3C/path%3E%3Cpath%20d='M29%2020%20L37%2032'%3E%3CanimateTransform%20attributeName='transform'%20type='rotate'%20values='12%2029%2020%3B-14%2029%2020%3B12%2029%2020'%20dur='1s'%20repeatCount='indefinite'/%3E%3C/path%3E%3Cpath%20d='M19.5%2046%20L17.5%2064'%3E%3CanimateTransform%20attributeName='transform'%20type='rotate'%20values='-9%2019.5%2046%3B9%2019.5%2046%3B-9%2019.5%2046'%20dur='0.4s'%20repeatCount='indefinite'/%3E%3C/path%3E%3Cpath%20d='M24.5%2046%20L26.5%2062'%3E%3CanimateTransform%20attributeName='transform'%20type='rotate'%20values='9%2024.5%2046%3B-9%2024.5%2046%3B9%2024.5%2046'%20dur='0.4s'%20repeatCount='indefinite'/%3E%3C/path%3E%3C/g%3E%3Ccircle%20cx='22'%20cy='13'%20r='5.6'%20fill='%23FFFFFF'/%3E%3Cpath%20d='M15%2020%20Q22%2015.5%2029%2020%20L26%2045.5%20Q22%2048.5%2018%2045.5%20Z'%20fill='%23FFFFFF'/%3E%3C/svg%3E") center / contain no-repeat;
+        opacity: 0;
+        transform: translate(-50%, -50%);
+        filter: drop-shadow(0 4px 8px rgba(5,40,50,0.35));
+        pointer-events: none;
+    }
+
+    .home-lanes.mini .home-lane::after { width: 24px; height: 38px; }
+
+    .home-lane:hover::after {
+        animation: swim-up 1.7s cubic-bezier(0.3, 0.55, 0.35, 1) forwards;
+    }
+
+    @keyframes swim-up {
+        0%   { opacity: 0; top: 100%; transform: translate(-50%, -50%) rotate(0deg); }
+        7%   { opacity: 1; }
+        30%  { transform: translate(-56%, -50%) rotate(-3deg); }
+        55%  { transform: translate(-44%, -50%) rotate(3deg); }
+        80%  { transform: translate(-53%, -50%) rotate(-2deg); }
+        100% { opacity: 1; top: 14%; transform: translate(-50%, -50%) rotate(0deg); }
+    }
+
+    @media (max-width: 1150px) {
+        .home-lanes { grid-template-columns: repeat(4, 1fr); }
+        .home-lane { min-height: 44vh; }
+        .home-lanes.mini .home-lane { min-height: 100px; }
+        .pool-rope { display: none; }
+        .pool-rope:nth-of-type(2n) { display: block; }
+    }
+
+    @media (max-width: 650px) {
+        .home-lanes { grid-template-columns: repeat(2, 1fr); }
+        .home-lane { min-height: 36vh; }
+        .home-lanes.mini .home-lane { min-height: 92px; }
+        .pool-rope:nth-of-type(2n) { display: none; }
+        .pool-rope:nth-of-type(4) { display: block; }
+    }
+
+    .pool-foot {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 22px;
+        margin: 18px 0 6px 0;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #5A7480;
+    }
+
+    .pool-foot span { display: inline-flex; align-items: center; gap: 7px; }
+    .pool-foot i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+
+    /* ============================================================
+       CARDS / CALLOUTS
+    ============================================================ */
+
+    .kpi-card {
+        background-color: #FFFFFF;
+        padding: 22px 22px;
+        border-radius: 18px;
+        border: 1px solid #D8E9E8;
+        box-shadow: 0 14px 30px -22px rgba(12,74,90,0.45);
+        min-height: 130px;
+    }
+
+    .kpi-label {
+        font-size: 12px; text-transform: uppercase; color: #5A7480;
+        font-weight: 700; letter-spacing: 0.1em;
+    }
+
+    .kpi-value {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-weight: 400; font-size: 44px; color: #0C4A5A;
+        margin-top: 6px; line-height: 1;
+    }
+
+    .kpi-note { font-size: 13px; color: #5A7480; margin-top: 5px; }
+
+    .info-box {
+        background-color: #FFFFFF;
+        border-left: 5px solid #1B6E7E;
+        border-radius: 16px; padding: 18px 22px; margin: 16px 0;
+        box-shadow: 0 14px 30px -24px rgba(12,74,90,0.4);
+        color: #2A3B42;
+    }
+
+    .warning-box {
+        background-color: #FBF4E2;
+        border-left: 5px solid #C9A24B;
+        border-radius: 16px; padding: 18px 22px; margin: 16px 0;
+        color: #4A3E1E;
+    }
+
+    .small-caption { font-size: 13px; color: #5A7480; line-height: 1.45; }
+    div[data-testid="stMetricValue"] { color: #0C4A5A; }
+    div[data-testid="stSidebar"] { background-color: #DFF0EF; }
+
+    /* stat chips kept available (not used on Home now) */
+    .pool-stats { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px 40px; margin: 22px auto 6px auto; }
+    .pool-stat { display: flex; flex-direction: column; align-items: center; background: transparent; border: none; box-shadow: none; padding: 0; }
+    .ps-num { font-family: 'Anton', system-ui, sans-serif; font-weight: 400; font-size: 34px; line-height: 1; color: #0C4A5A; }
+    .ps-lab { margin-top: 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #5A7480; }
+
+    /* ============================================================
+       SWIM PHOTOS (with graceful placeholder)
+    ============================================================ */
+
+    .swim-figure {
+        position: relative; overflow: hidden;
+        border-radius: 20px; border: 1px solid #D8E9E8;
+        box-shadow: 0 24px 50px -30px rgba(12,74,90,0.55);
+        background: #CFE6E6;
+    }
+
+    .swim-figure-inner { position: relative; width: 100%; }
+
+    .swim-figure-inner > img,
+    .swim-figure-inner > .img-ph-label {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+    }
+
+    .swim-figure-inner > img { object-fit: cover; display: block; }
+
+    .swim-figure.is-placeholder {
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='40'%3E%3Cg fill='none' stroke='%231B6E7E' stroke-opacity='0.26' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M0 12 q15 -8 30 0 t30 0 t30 0 t30 0'/%3E%3Cpath d='M0 28 q15 -8 30 0 t30 0 t30 0 t30 0'/%3E%3C/g%3E%3C/svg%3E") repeat, linear-gradient(135deg, #E6F0EC 0%, #CFE6E6 100%);
+    }
+
+    .img-ph-label {
+        display: flex; align-items: center; justify-content: center;
+        text-align: center; color: #3C6672;
+        font-weight: 600; font-size: 14px; line-height: 1.4; padding: 18px;
+    }
+
+    .img-ph-label b { color: #1B6E7E; }
+
+    /* ============================================================
+       SWIM RECORD TOE — GAME
+    ============================================================ */
+
+    .game-turn-card {
+        background: linear-gradient(135deg, #FFFFFF 0%, #E4F2F1 100%);
+        border: 1px solid #D8E9E8; border-radius: 20px;
+        padding: 16px 20px; box-shadow: 0 10px 24px -16px rgba(12,74,90,0.4);
+        color: #0C4A5A; text-align: center;
+    }
+
+    .game-turn-card .gt-label {
+        font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em;
+        font-weight: 700; color: #5A7480;
+    }
+
+    .game-turn-card .gt-value {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-weight: 400; color: #0C4A5A; margin-top: 4px; line-height: 1.05;
+    }
+
+    .game-axis-label {
+        font-family: 'Anton', system-ui, sans-serif;
+        text-transform: uppercase; letter-spacing: 0.02em;
+        font-size: 15px; font-weight: 400;
+        background: #0C4A5A; color: white; border-radius: 16px;
+        padding: 12px 10px; text-align: center; min-height: 64px;
+        display: flex; align-items: center; justify-content: center;
+        line-height: 1.1; box-shadow: 0 10px 20px -10px rgba(12,74,90,0.4);
+        margin-bottom: 20px;
+    }
+
+    .game-row-label {
+        font-family: 'Anton', system-ui, sans-serif;
+        text-transform: uppercase; letter-spacing: 0.02em;
+        font-size: 15px; font-weight: 400;
+        background: linear-gradient(135deg, #1B6E7E 0%, #2C8093 100%); color: white;
+        border-radius: 16px; padding: 12px 10px; text-align: center; min-height: 78px;
+        display: flex; align-items: center; justify-content: center;
+        line-height: 1.1; box-shadow: 0 10px 20px -10px rgba(12,74,90,0.35);
+        margin-right: 14px;
+    }
+
+    div[class*="st-key-swim_toe_cell_"] button {
+        min-height: 78px !important;
+    }
+
+    .game-empty-corner { background: transparent; min-height: 64px; margin-bottom: 20px;}
+
+    div[data-testid="stButton"] button {
+        font-family: 'Barlow', system-ui, sans-serif;
+        border-radius: 16px;
+        border: 1.5px solid rgba(27,110,126,0.28);
+        background: linear-gradient(135deg, #EAF6F5 0%, #C7E7E7 48%, #9AD5D6 100%);
+        color: #0C4A5A; font-weight: 700; min-height: 62px;
+        box-shadow: 0 10px 22px -14px rgba(12,74,90,0.3);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        white-space: pre-line;
+    }
+
+    div[data-testid="stButton"] button:hover {
+        border-color: #1B6E7E; transform: translateY(-2px);
+        box-shadow: 0 16px 28px -14px rgba(12,74,90,0.4);
+    }
+
+    div[data-testid="stButton"] button:disabled {
+        background: #E1EEED; color: #7A93A0; border-color: #D2E6E5;
+        box-shadow: none; transform: none;
+    }
+
+    /* ============================================================
+       HOME HEADER — free, poster-style, fills the whole top area.
+       Logo + kicker line, big two-tone title (no box), tagline,
+       waves + site description.
+    ============================================================ */
+
+    .home-head { margin: 2px 0 14px 0; }
+
+    .home-topline {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 12px;
+    }
+
+    .home-logo .brand-logo {
+        width: 46px;
+        height: 46px;
+        flex: none;
+        filter: drop-shadow(0 8px 16px rgba(12,74,90,0.28));
+    }
+
+    .home-kicker {
+        flex: 1;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #1B6E7E;
+        line-height: 1.2;
+    }
+
+    .home-chevrons {
+        color: #22B8CF;
+        font-weight: 800;
+        letter-spacing: -0.08em;
+        font-size: 22px;
+        flex: none;
+    }
+
+    .home-title {
+        margin: 0;
+        font-family: 'Anton', system-ui, sans-serif;
+        font-weight: 400;
+        text-transform: uppercase;
+        line-height: 0.86;
+        letter-spacing: 0.01em;
+        color: #0C4A5A;
+        font-size: clamp(46px, 6.4vw, 88px);
+    }
+
+    .home-title .l2 { color: #C9A24B; }
+
+    /* two-column body: text on the left, photo on the right (fills the space) */
+    .home-main {
+        display: grid;
+        grid-template-columns: 1.3fr 0.82fr;
+        gap: 34px;
+        align-items: stretch;
+        margin-top: 2px;
+    }
+
+    .home-media {
+        position: relative;
+        border-radius: 20px;
+        overflow: hidden;
+        min-height: 240px;
+        border: 1px solid #D2E6E5;
+        box-shadow: 0 22px 46px -28px rgba(12,74,90,0.55);
+        background: #CFE6E6;
+    }
+
+    .home-media img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .home-media .img-ph-label {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .home-tagline {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 10px 0 12px 0;
+        font-family: 'Anton', system-ui, sans-serif;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        font-size: clamp(20px, 2.7vw, 34px);
+        line-height: 1;
+        color: #1B6E7E;
+    }
+
+    .home-tagline .chev {
+        color: #22B8CF;
+        font-family: 'Barlow', system-ui, sans-serif;
+        font-weight: 800;
+        font-size: 0.66em;
+        letter-spacing: -0.08em;
+    }
+
+    .home-waves {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin: 2px 0 12px 0;
+    }
+
+    .home-waves span {
+        display: block;
+        height: 9px;
+        flex: 1;
+        max-width: 260px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='42' height='9'%3E%3Cpath d='M0 4.5 q5.25 -4.5 10.5 0 t10.5 0 t10.5 0 t10.5 0' fill='none' stroke='%231B6E7E' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") repeat-x left center / 42px 9px;
+        opacity: 0.5;
+    }
+
+    .home-waves span:nth-child(2) { max-width: 180px; }
+    .home-waves span:nth-child(3) { max-width: 110px; }
+
+    .home-desc {
+        margin: 0;
+        font-size: 16.5px;
+        font-weight: 500;
+        color: #3E5964;
+        line-height: 1.5;
+    }
+
+    .home-desc b { color: #0C4A5A; }
+
+    @media (max-width: 850px) {
+        .home-main { grid-template-columns: 1fr; gap: 18px; }
+        .home-media { min-height: 200px; }
+        .home-title { font-size: 46px; }
+        .home-tagline { font-size: 20px; }
+    }
+
+    /* ============================================================
+       CINEMATIC HOME HERO — full-bleed, dark, poster style
+    ============================================================ */
+
+    .home-cine {
+        position: relative;
+        overflow: hidden;
+        min-height: 56vh;
+        display: flex;
+        align-items: center;
+        background: #06222B;
+        margin-bottom: 12px;
+    }
+
+    .cine-bg { position: absolute; inset: 0; z-index: 0; }
+    .cine-bg img {
+        width: 100%; height: 100%;
+        object-fit: cover;
+        filter: brightness(0.5) saturate(0.85) contrast(1.05);
+    }
+
+    .cine-overlay {
+        position: absolute; inset: 0; z-index: 1;
+        background:
+            linear-gradient(90deg, rgba(4,22,28,0.97) 0%, rgba(4,22,28,0.86) 28%, rgba(4,22,28,0.45) 55%, rgba(4,22,28,0.35) 100%),
+            linear-gradient(180deg, rgba(4,22,28,0.35) 0%, rgba(4,22,28,0.15) 45%, rgba(4,22,28,0.55) 100%);
+    }
+
+    .cine-inner {
+        position: relative;
+        z-index: 4;
+        width: 100%;
+        max-width: 1560px;
+        margin: 0 auto;
+        padding: 5vh clamp(26px, 6vw, 96px);
+        display: grid;
+        grid-template-columns: 1.12fr 0.88fr;
+        gap: 30px;
+        align-items: center;
+    }
+
+    .cine-kicker {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.17em;
+        text-transform: uppercase;
+        color: #6FD3DE;
+        margin-bottom: 16px;
+    }
+
+    .cine-kicker .brand-logo { width: 42px; height: 42px; flex: none; }
+
+    .cine-title {
+    margin: 0;
+    font-family: 'Anton', system-ui, sans-serif;
+    font-weight: 400;
+    text-transform: uppercase;
+    color: #E7B94A !important;
+    font-size: clamp(92px, 12vw, 180px);
+    line-height: 0.82;
+    letter-spacing: 0.01em;
+    transform: skewX(-8deg);
+    transform-origin: left;
+    text-shadow: 0 12px 38px rgba(0,0,0,0.62);
+}
+
+.cine-title span,
+.cine-title .gold {
+    color: #E7B94A !important;
+}
+
+    .cine-tag {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 18px 0 14px 0;
+        font-family: 'Anton', system-ui, sans-serif;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        font-size: clamp(20px, 2.7vw, 34px);
+        line-height: 1;
+        color: #6FD3DE;
+        transform: skewX(-8deg);
+        transform-origin: left;
+    }
+
+    .cine-tag .chev {
+        color: #FFFFFF;
+        font-family: 'Barlow', system-ui, sans-serif;
+        font-weight: 800;
+        font-size: 0.6em;
+        letter-spacing: -0.06em;
+    }
+
+    .cine-desc {
+        margin: 0;
+        max-width: 560px;
+        color: #C7DBDE;
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.5;
+    }
+
+    .cine-desc b { color: #FFFFFF; }
+
+    .cine-cards {
+        position: relative;
+        height: 44vh;
+        min-height: 300px;
+    }
+
+    .cine-card {
+        position: absolute;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 3px solid rgba(255,255,255,0.92);
+        box-shadow: 0 34px 60px -22px rgba(0,0,0,0.65);
+    }
+
+    .cine-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    .cine-card.c1 { width: 46%; height: 76%; top: 6%; left: 6%; transform: rotate(-6deg); z-index: 2; }
+    .cine-card.c2 { width: 46%; height: 86%; top: 10%; left: 46%; transform: rotate(5deg); z-index: 3; }
+
+    .cine-chev {
+        position: absolute;
+        z-index: 5;
+        color: #FFFFFF;
+        font-family: 'Barlow', system-ui, sans-serif;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        font-size: 26px;
+        opacity: 0.95;
+        text-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    }
+
+    .cine-chev.tr { top: 56px; right: 40px; }
+    .cine-chev.br { bottom: 20px; left: 50%; transform: translateX(-50%); }
+
+@media (max-width: 900px) {
+    .cine-inner { grid-template-columns: 1fr; padding: 4vh 24px; }
+    .cine-cards { display: none; }
+    .cine-title { font-size: 72px; }
+    .home-cine { min-height: 48vh; }
+}
+
+
+    .fact-box {
+        margin: -14px 0 28px 0;
+        max-width: 680px;
+        background: linear-gradient(135deg, #FFFFFF 0%, #EAF6F5 100%);
+        border: 1px solid #D8E9E8;
+        border-left: 6px solid #C9A24B;
+        border-radius: 18px;
+        padding: 18px 22px;
+        box-shadow: 0 18px 38px -28px rgba(12,74,90,0.55);
+    }
+
+    .timeline-record-card {
+        background: linear-gradient(135deg, #FFFFFF 0%, #EAF6F5 100%);
+        border: 1px solid #D8E9E8;
+        border-left: 6px solid #C9A24B;
+        border-radius: 18px;
+        padding: 16px 20px;
+        margin-top: 2px;
+        box-shadow: 0 16px 34px -26px rgba(12,74,90,0.55);
+    }
+
+    .timeline-control-row {
+        margin-top: 18px;
+        margin-bottom: 28px;
+    }
+
+    .timeline-metrics-row {
+        margin-top: 10px;
+        margin-bottom: 26px;
+    }
+
+    .timeline-chart-spacer {
+        height: 10px;
+    }
+
+
+    .timeline-record-kicker {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #C9A24B;
+        margin-bottom: 6px;
+    } 
+
+    .timeline-record-main {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-size: 30px;
+        line-height: 1.05;
+        color: #0C4A5A;
+        text-transform: uppercase;
+    }
+
+    .timeline-record-sub {
+        margin-top: 7px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #3E5964;
+        line-height: 1.4;
+    }
+
+    .timeline-selector-note {
+        font-size: 13px;
+        font-weight: 500;
+        color: #5A7480;
+        margin-top: -6px;
+        margin-bottom: 8px;
+    }
+
+    .fact-kicker {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #C9A24B;
+        margin-bottom: 7px;
+    }
+
+    .fact-text {
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.5;
+        color: #24343B;
+    }
+
+    .fact-text b {
+        color: #0C4A5A;
+    }
+
+    .glossary-wrap {
+        max-width: 1100px;
+        margin: 34px auto 10px auto;
+        padding: 0 8px;
+    }
+
+    .glossary-title {
+        font-family: 'Anton', system-ui, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        font-size: 26px;
+        color: #0C4A5A;
+        margin-bottom: 4px;
+    }
+
+    .glossary-intro {
+        font-size: 14.5px;
+        font-weight: 500;
+        color: #5A7480;
+        margin-bottom: 16px;
+    }
+
+    .glossary-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .glossary-item {
+        flex: 1 1 240px;
+        background: linear-gradient(135deg, #FFFFFF 0%, #EAF6F5 100%);
+        border: 1px solid #D8E9E8;
+        border-left: 5px solid #C9A24B;
+        border-radius: 14px;
+        padding: 12px 16px;
+    }
+
+    .glossary-term {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-size: 19px;
+        color: #0C4A5A;
+        letter-spacing: 0.02em;
+    }
+
+    .glossary-def {
+        font-size: 13.5px;
+        font-weight: 500;
+        color: #3E5964;
+        line-height: 1.45;
+        margin-top: 3px;
+    }
+
+    .athlete-card {
+        background: linear-gradient(135deg, #FFFFFF 0%, #EAF6F5 100%);
+        border: 1px solid #D8E9E8;
+        border-left: 6px solid #C9A24B;
+        border-radius: 18px;
+        padding: 20px 24px;
+        margin: 6px 0 18px 0;
+        box-shadow: 0 18px 38px -28px rgba(12,74,90,0.55);
+    }
+
+    .athlete-card-kicker {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #C9A24B;
+        margin-bottom: 6px;
+    }
+
+    .athlete-card-name {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-size: 34px;
+        line-height: 1.05;
+        color: #0C4A5A;
+        text-transform: uppercase;
+    }
+
+    .athlete-card-meta {
+        margin-top: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #3E5964;
+        line-height: 1.5;
+    }
+
+    .athlete-stat-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 16px;
+    }
+
+    .athlete-stat {
+        flex: 1 1 110px;
+        background: rgba(255,255,255,0.75);
+        border: 1px solid #D8E9E8;
+        border-radius: 12px;
+        padding: 10px 12px;
+        text-align: center;
+    }
+
+    .athlete-stat-value {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-size: 24px;
+        color: #0C4A5A;
+        line-height: 1.1;
+    }
+
+    .athlete-stat-label {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: #5A7480;
+        margin-top: 4px;
+    }
+
+    .vs-badge {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 160px;
+    }
+
+    .vs-badge-inner {
+        font-family: 'Anton', system-ui, sans-serif;
+        font-size: 46px;
+        color: #C9A24B;
+        background: #FFFFFF;
+        border: 3px solid #C9A24B;
+        border-radius: 50%;
+        width: 92px;
+        height: 92px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 16px 34px -24px rgba(12,74,90,0.65);
+    }
+
+    
+
+    /* ============================================================
+       MOBILE / TOUCH — smartphone-first refinements
+    ============================================================ */
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { overflow-x: hidden; }
+
+    button, input, textarea, select, [role="button"] {
+        touch-action: manipulation;
+    }
+
+    div[data-testid="stDataFrame"],
+    div[data-testid="stTable"],
+    div[data-testid="stPlotlyChart"] {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    div[data-testid="stPlotlyChart"] > div,
+    div[data-testid="stPlotlyChart"] iframe {
+        max-width: 100% !important;
+    }
+
+    @media (max-width: 768px) {
+        .block-container {
+            width: 100%;
+            max-width: 100%;
+            padding: 0.45rem 0.85rem 2.5rem 0.85rem !important;
+        }
+
+        header[data-testid="stHeader"] {
+            height: 2.6rem;
+        }
+
+        .fullbleed {
+            left: auto;
+            right: auto;
+            width: calc(100% + 1.7rem);
+            margin-left: -0.85rem;
+            margin-right: -0.85rem;
+        }
+
+        .section-title {
+            font-size: clamp(31px, 10vw, 42px);
+            line-height: 0.98;
+            overflow-wrap: anywhere;
+            margin-top: 10px;
+        }
+
+        .section-subtitle {
+            max-width: none;
+            font-size: 15px;
+            line-height: 1.48;
+            margin-bottom: 14px;
+        }
+
+        .wave-rule { margin-bottom: 10px; }
+
+        .home-cine {
+            min-height: 66svh;
+            align-items: flex-end;
+            margin-bottom: 10px;
+        }
+
+        .cine-overlay {
+            background:
+                linear-gradient(180deg, rgba(4,22,28,0.32) 0%, rgba(4,22,28,0.72) 45%, rgba(4,22,28,0.98) 100%),
+                linear-gradient(90deg, rgba(4,22,28,0.72), rgba(4,22,28,0.28));
+        }
+
+        .cine-inner {
+            display: block;
+            padding: 4.5rem 1.1rem 2rem 1.1rem;
+        }
+
+        .cine-kicker {
+            font-size: 10px;
+            letter-spacing: 0.11em;
+            line-height: 1.35;
+            margin-bottom: 13px;
+        }
+
+        .cine-kicker .brand-logo { width: 34px; height: 34px; }
+
+        .cine-title {
+            font-size: clamp(50px, 16vw, 78px) !important;
+            line-height: 0.87;
+            transform: skewX(-5deg);
+            overflow-wrap: anywhere;
+        }
+
+        .cine-tag {
+            font-size: clamp(18px, 6vw, 25px);
+            margin: 16px 0 12px 0;
+            transform: skewX(-5deg);
+        }
+
+        .cine-desc {
+            font-size: 14.5px;
+            line-height: 1.48;
+            max-width: none;
+        }
+
+        .cine-chev.tr { top: 46px; right: 16px; font-size: 20px; }
+        .cine-chev.br { display: none; }
+
+        /* Home: 8 tappable lanes in a compact two-column grid. */
+        .home-lanes:not(.mini) {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            animation-duration: 40s;
+        }
+
+        .home-lanes:not(.mini) .home-lane {
+            min-height: 168px;
+            border: 1px solid rgba(255,255,255,0.13);
+        }
+
+        .home-lanes:not(.mini) .hl-btn {
+            margin: 10px 8px 0 8px;
+            padding: 10px 5px;
+            border-radius: 12px;
+        }
+
+        .home-lanes:not(.mini) .hl-name { font-size: 14px; }
+        .home-lanes:not(.mini) .hl-tag { font-size: 8px; letter-spacing: 0.07em; }
+        .home-lanes:not(.mini) .hl-num { font-size: 31px; bottom: 10px; }
+        .home-lanes:not(.mini) .pool-rope { display: none !important; }
+        .home-lanes:not(.mini) .home-lane::after { display: none; }
+
+        /* Inner pages: horizontal swipe navigation, always one row. */
+        .mini-pool {
+            margin: 0 0 16px 0;
+            padding: 11px 10px 12px 10px;
+            border-radius: 16px;
+        }
+
+        .mini-pool-head {
+            margin: 0 2px 9px 2px;
+            align-items: flex-start;
+        }
+
+        .mini-pool-brand span { font-size: 16px; }
+        .mini-pool-current { width: 100%; font-size: 11.5px; }
+
+        .home-lanes.mini {
+            display: flex;
+            gap: 7px;
+            overflow-x: auto;
+            overscroll-behavior-inline: contain;
+            scroll-snap-type: x mandatory;
+            scrollbar-width: none;
+            padding: 2px 2px 7px 2px;
+            background-size: 100px 34px, 170px 58px, 100% 100%;
+        }
+
+        .home-lanes.mini::-webkit-scrollbar { display: none; }
+        .home-lanes.mini .home-lane {
+            flex: 0 0 112px;
+            min-width: 112px;
+            min-height: 84px;
+            scroll-snap-align: start;
+            border-radius: 11px;
+        }
+        .home-lanes.mini .hl-btn { margin: 7px 5px 0; padding: 7px 4px; }
+        .home-lanes.mini .hl-name { font-size: 11.5px; }
+        .home-lanes.mini .hl-tag { font-size: 7px; }
+        .home-lanes.mini .hl-num { font-size: 20px; bottom: 5px; }
+        .home-lanes.mini .pool-rope,
+        .home-lanes.mini .home-lane::after { display: none !important; }
+
+        .pool-foot { gap: 10px 16px; font-size: 11px; }
+
+        .glossary-wrap { margin-top: 24px; padding: 0; }
+        .glossary-title { font-size: 24px; }
+        .glossary-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
+        .glossary-item { padding: 11px 13px; }
+
+        .kpi-card {
+            min-height: 0;
+            padding: 16px;
+            border-radius: 14px;
+        }
+        .kpi-value { font-size: 35px; }
+
+        .info-box, .warning-box, .fact-box, .timeline-record-card, .athlete-card {
+            padding: 14px 15px;
+            border-radius: 14px;
+            margin: 12px 0;
+        }
+
+        .fact-box { margin-top: 4px; }
+        .fact-text { font-size: 14.5px; }
+        .timeline-record-main { font-size: 25px; overflow-wrap: anywhere; }
+        .athlete-card-name { font-size: 29px; overflow-wrap: anywhere; }
+        .athlete-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); }
+        .athlete-stat { min-width: 0; }
+
+        div[data-testid="stMetric"] {
+            background: rgba(255,255,255,0.72);
+            border: 1px solid #D8E9E8;
+            border-radius: 13px;
+            padding: 12px;
+        }
+
+        div[data-testid="stMetricValue"] { font-size: 1.65rem; }
+
+        div[data-testid="stSelectbox"],
+        div[data-testid="stMultiSelect"],
+        div[data-testid="stTextInput"],
+        div[data-testid="stSlider"] {
+            margin-bottom: 0.25rem;
+        }
+
+        div[data-baseweb="select"] > div,
+        div[data-testid="stTextInput"] input {
+            min-height: 46px;
+            font-size: 16px;
+        }
+
+        div[data-testid="stButton"] button {
+            min-height: 48px;
+            border-radius: 13px;
+            font-size: 14px;
+            padding: 0.55rem 0.7rem;
+        }
+
+        /* Keep the game grid on one row instead of stacking its four cells. */
+        div[data-testid="stHorizontalBlock"]:has(.game-axis-label),
+        div[data-testid="stHorizontalBlock"]:has(.game-row-label),
+        div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-swim_toe_cell_"]) {
+            flex-wrap: nowrap !important;
+            gap: 0.25rem !important;
+        }
+
+        div[data-testid="stHorizontalBlock"]:has(.game-axis-label) > div[data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has(.game-row-label) > div[data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has(div[class*="st-key-swim_toe_cell_"]) > div[data-testid="column"] {
+            min-width: 0 !important;
+        }
+
+        .game-axis-label, .game-row-label {
+            min-height: 58px;
+            padding: 7px 4px;
+            margin: 0 0 7px 0;
+            border-radius: 10px;
+            font-size: 10px;
+            overflow-wrap: anywhere;
+        }
+
+        .game-row-label { margin-right: 0; }
+        .game-empty-corner { min-height: 58px; margin-bottom: 7px; }
+        div[class*="st-key-swim_toe_cell_"] button {
+            min-height: 58px !important;
+            font-size: 10px !important;
+            line-height: 1.1 !important;
+            padding: 4px !important;
+            overflow-wrap: anywhere;
+        }
+        .game-turn-card { padding: 12px 8px; border-radius: 13px; }
+
+        .vs-badge { min-height: 70px; }
+        .vs-badge-inner { width: 62px; height: 62px; font-size: 31px; }
+
+        /* Long labels and Plotly modebar must not escape the viewport. */
+        .modebar-container { transform: scale(0.86); transform-origin: top right; }
+        .js-plotly-plot, .plot-container, .svg-container { max-width: 100% !important; }
+
+        /* Sidebar becomes a clean mobile drawer. */
+        section[data-testid="stSidebar"] {
+            width: min(88vw, 340px) !important;
+        }
+        section[data-testid="stSidebar"] > div {
+            padding-top: 1.2rem;
+        }
+    }
+<<<<<<< HEAD
+
+    @media (max-width: 430px) {
+        .block-container { padding-left: 0.65rem !important; padding-right: 0.65rem !important; }
+        .fullbleed { width: calc(100% + 1.3rem); margin-left: -0.65rem; margin-right: -0.65rem; }
+        .cine-title { font-size: clamp(46px, 15vw, 64px) !important; }
+        .home-lanes:not(.mini) .home-lane { min-height: 150px; }
+        .home-lanes.mini .home-lane { flex-basis: 104px; min-width: 104px; }
+        .athlete-stat-grid { grid-template-columns: 1fr 1fr; gap: 7px; }
+        .athlete-stat-value { font-size: 21px; }
+    }
+
+=======
+    
+>>>>>>> parent of 429c99e (gioco)
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# ============================================================
+# UTILITY FUNCTIONS
+# ============================================================
+
+def fix_mojibake(value):
+    """Repair double-encoded text (UTF-8 read as cp1252/latin-1).
+
+    The source files contain artefacts like "ZoltAn" or "4x100m" where the
+    original accented characters were mangled. Re-encoding and decoding
+    restores them. Applied repeatedly because some strings were mangled twice.
+    """
+    for _ in range(3):
+        if not any(marker in value for marker in ("\u00c3", "\u00c2", "\u00e2\u20ac")):
+            break
+        repaired = None
+        for encoding in ("cp1252", "latin-1"):
+            try:
+                repaired = value.encode(encoding).decode("utf-8")
+                break
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+        if repaired is None or repaired == value:
+            break
+        value = repaired
+    return value
+
+
+def clean_text(value):
+    """Clean text values, repairing mojibake and collapsing whitespace."""
+    if pd.isna(value):
+        return ""
+    value = fix_mojibake(str(value))
+    value = value.replace("\xa0", " ")
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
+def athlete_key(value):
+    """A single identity key shared by both datasets.
+
+    The world record file writes "Jonty Skinner", the top-200 file writes
+    "SKINNER, Jonty". Without this key the same swimmer never matches across
+    the two sources. Accents are folded so "Zoltan" and "Zoltán" agree.
+    """
+    if not isinstance(value, str):
+        return ""
+    text = clean_text(value)
+    text = "".join(
+        ch for ch in unicodedata.normalize("NFKD", text)
+        if not unicodedata.combining(ch)
+    )
+    if "," in text:
+        last, first = text.split(",", 1)
+        text = f"{first.strip()} {last.strip()}"
+    text = re.sub(r"[^A-Za-z ]", " ", text)
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
+def pretty_name(value):
+    """Turn 'SKINNER, Jonty' into 'Jonty Skinner'; leave normal names alone."""
+    text = clean_text(value)
+    if "," in text:
+        last, first = text.split(",", 1)
+        text = f"{first.strip()} {last.strip()}"
+    parts = [p.capitalize() if p.isupper() else p for p in text.split()]
+    return " ".join(parts)
+
+
+def snake_case(col):
+    """Convert any column name to snake_case."""
+    col = str(col)
+    col = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", col)
+    col = re.sub(r"[^0-9a-zA-Z]+", "_", col)
+    col = col.strip("_").lower()
+    return col
+
+
+def format_time(seconds):
+    """Format swimming seconds into mm:ss.xx or ss.xx."""
+    if pd.isna(seconds):
+        return ""
+    try:
+        seconds = float(seconds)
+    except Exception:
+        return ""
+
+    if seconds >= 60:
+        minutes = int(seconds // 60)
+        sec = seconds - minutes * 60
+        return f"{minutes}:{sec:05.2f}"
+    return f"{seconds:.2f}"
+
+
+def time_to_seconds(value):
+    """Convert different time formats into seconds."""
+    if pd.isna(value):
+        return np.nan
+
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        return float(value)
+
+    s = clean_text(value).replace(",", ".")
+
+    if not s:
+        return np.nan
+
+    parts = s.split(":")
+
+    try:
+        if len(parts) == 3:
+            h = float(parts[0])
+            m = float(parts[1])
+            sec = float(parts[2])
+            return h * 3600 + m * 60 + sec
+        if len(parts) == 2:
+            m = float(parts[0])
+            sec = float(parts[1])
+            return m * 60 + sec
+        return float(s)
+    except Exception:
+        return np.nan
+
+
+def parse_any_date(value):
+    """Parse date values, including Excel serial dates and text dates."""
+    if pd.isna(value):
+        return pd.NaT
+
+    if isinstance(value, pd.Timestamp):
+        return value
+
+    if isinstance(value, (int, float, np.integer, np.floating)):
+        if value > 20000:
+            return pd.to_datetime("1899-12-30") + pd.to_timedelta(float(value), unit="D")
+        return pd.NaT
+
+    s = clean_text(value)
+    if not s:
+        return pd.NaT
+
+    date_1 = pd.to_datetime(s, errors="coerce", dayfirst=True)
+    if not pd.isna(date_1):
+        return date_1
+
+    return pd.to_datetime(s, errors="coerce")
+
+
+def normalize_gender(value):
+    s = clean_text(value).lower()
+
+    if s in ["m", "men", "male", "man"]:
+        return "Men"
+    if s in ["f", "women", "woman", "female"]:
+        return "Women"
+    if "mixed" in s:
+        return "Mixed"
+    return "Unknown"
+
+
+def normalize_course(value):
+    s = clean_text(value).upper()
+
+    if s in ["LC", "LCM", "LONG COURSE", "LONG COURSE METERS"]:
+        return "LC"
+    if s in ["SC", "SCM", "SHORT COURSE", "SHORT COURSE METERS"]:
+        return "SC"
+    if "LCM" in s or "LONG" in s:
+        return "LC"
+    if "SCM" in s or "SHORT" in s:
+        return "SC"
+    return "Unknown"
+
+
+DISPLAY_IT = {
+    "Men": "Uomini",
+    "Women": "Donne",
+    "Mixed": "Misti",
+    "Unknown": "Non disponibile",
+    "Freestyle": "Stile libero",
+    "Backstroke": "Dorso",
+    "Breaststroke": "Rana",
+    "Butterfly": "Farfalla",
+    "Medley": "Misti",
+    "LC": "LC · vasca lunga",
+    "SC": "SC · vasca corta",
+}
+
+
+def display_it(value):
+    """Etichetta italiana per categorie mantenute in inglese nei file sorgente."""
+    return DISPLAY_IT.get(clean_text(value), clean_text(value))
+
+
+def translate_event_label(value):
+    """Traduce le etichette gara senza modificare i dati numerici sottostanti."""
+    text = clean_text(value)
+    replacements = [
+        (r"^Men(?:'s)?\b", "Uomini"),
+        (r"^Women(?:'s)?\b", "Donne"),
+        (r"^Mixed\b", "Misti"),
+        (r"\bIndividual Medley\b", "Misti individuali"),
+        (r"\bFreestyle Relay\b", "Staffetta stile libero"),
+        (r"\bMedley Relay\b", "Staffetta mista"),
+        (r"\bFreestyle\b", "Stile libero"),
+        (r"\bBackstroke\b", "Dorso"),
+        (r"\bBreaststroke\b", "Rana"),
+        (r"\bButterfly\b", "Farfalla"),
+        (r"\bMedley\b", "Misti"),
+        (r"\bRelay\b", "Staffetta"),
+        (r"\bLCM\b", "(LC)"),
+        (r"\bSCM\b", "(SC)"),
+        (r"Unknown event", "Gara non disponibile"),
+    ]
+    for pattern, replacement in replacements:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    text = re.sub(r"(\d+)m\b", r"\1 m", text)
+    return text
+
+
+MONTHS_IT = {
+    1: "gen", 2: "feb", 3: "mar", 4: "apr", 5: "mag", 6: "giu",
+    7: "lug", 8: "ago", 9: "set", 10: "ott", 11: "nov", 12: "dic",
+}
+
+
+def format_date_it(value):
+    """Formatta una data con abbreviazioni italiane, senza dipendere dalla locale del server."""
+    if pd.isna(value):
+        return "Data non disponibile"
+    value = pd.Timestamp(value)
+    return f"{value.day:02d} {MONTHS_IT[value.month]} {value.year}"
+
+
+def display_game_value(column, value):
+    """Traduce le categorie del gioco senza alterare i valori usati per validare le risposte."""
+    if column in {"stroke", "course"}:
+        return display_it(value)
+    if column in {"event_label", "event_family"}:
+        return translate_event_label(value)
+    return clean_text(value)
+
+
+def parse_distance_from_text(text):
+    s = clean_text(text)
+    match = re.search(r"(?<!\d)(4x50|4x100|4x200|50|100|200|400|800|1500)\s*m?\b", s, flags=re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return ""
+
+
+def parse_stroke_from_text(text):
+    s = clean_text(text).lower()
+
+    if "freestyle" in s:
+        return "Freestyle"
+    if "backstroke" in s:
+        return "Backstroke"
+    if "breaststroke" in s:
+        return "Breaststroke"
+    if "butterfly" in s:
+        return "Butterfly"
+    if "medley" in s:
+        return "Medley"
+    return "Unknown"
+
+
+def first_existing_column(df, candidates):
+    for col in candidates:
+        if col in df.columns:
+            return col
+    return None
+
+
+def plotly_clean_layout(fig, height=480, title=None):
+    fig.update_layout(
+        height=height,
+        font=dict(family="Barlow", size=13, color=NAVY),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=30, r=30, t=70, b=40),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    if title:
+        fig.update_layout(title=title, title_font=dict(size=22, color=NAVY))
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(5,43,68,0.10)", zeroline=False)
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(5,43,68,0.10)", zeroline=False)
+    return fig
+
+
+def card(label, value, note=""):
+    st.markdown(
+        f"""
+        <div class="kpi-card">
+            <div class="kpi-label">{label}</div>
+            <div class="kpi-value">{value}</div>
+            <div class="kpi-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+def section(title, subtitle=""):
+    st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
+    if subtitle:
+        st.markdown(f"<div class='section-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+
+
+def safe_unique(series):
+    if series is None:
+        return []
+    return sorted([x for x in series.dropna().unique().tolist() if clean_text(x) != ""])
+
+
+def apply_common_filters(df, gender=True, course=True, stroke=True, distance=True, key_prefix=""):
+    filtered = df.copy()
+
+    with st.sidebar:
+
+        if gender and "gender" in filtered.columns:
+            genders = safe_unique(filtered["gender"])
+            selected_gender = st.multiselect(
+                "Genere",
+                genders,
+                default=genders,
+                format_func=display_it,
+                key=f"{key_prefix}_gender"
+            )
+            filtered = filtered[filtered["gender"].isin(selected_gender)]
+
+        if course and "course" in filtered.columns:
+            courses = safe_unique(filtered["course"])
+            selected_course = st.multiselect(
+                "Vasca",
+                courses,
+                default=courses,
+                format_func=display_it,
+                key=f"{key_prefix}_course"
+            )
+            filtered = filtered[filtered["course"].isin(selected_course)]
+
+        if stroke and "stroke" in filtered.columns:
+            strokes = safe_unique(filtered["stroke"])
+            selected_stroke = st.multiselect(
+                "Stile",
+                strokes,
+                default=strokes,
+                format_func=display_it,
+                key=f"{key_prefix}_stroke"
+            )
+            filtered = filtered[filtered["stroke"].isin(selected_stroke)]
+
+        if distance and "distance" in filtered.columns:
+            distances = safe_unique(filtered["distance"])
+            selected_distance = st.multiselect(
+                "Distanza",
+                distances,
+                default=distances,
+                key=f"{key_prefix}_distance"
+            )
+            filtered = filtered[filtered["distance"].isin(selected_distance)]
+
+    return filtered
+
+
+# ============================================================
+# DATA LOADING
+# ============================================================
+
+@st.cache_data
+def load_world_records():
+    if not WR_FILE.exists():
+        return pd.DataFrame()
+
+    df = pd.read_excel(WR_FILE)
+    df.columns = [snake_case(c) for c in df.columns]
+
+    for col in df.columns:
+        # pandas >= 3 returns StringDtype (not object) for text columns, so a
+        # plain object check would silently skip cleaning them.
+        if df[col].dtype == "object" or pd.api.types.is_string_dtype(df[col]):
+            df[col] = df[col].apply(clean_text)
+
+    if "seconds" not in df.columns:
+        time_col = first_existing_column(df, ["time", "swim_time", "duration"])
+        if time_col:
+            df["seconds"] = df[time_col].apply(time_to_seconds)
+        else:
+            df["seconds"] = np.nan
+    else:
+        df["seconds"] = pd.to_numeric(df["seconds"], errors="coerce")
+
+    if "time" not in df.columns:
+        df["time"] = df["seconds"].apply(format_time)
+    else:
+        df["time"] = df["time"].fillna(df["seconds"].apply(format_time))
+
+    if "date" in df.columns:
+        df["date"] = df["date"].apply(parse_any_date)
+    else:
+        df["date"] = pd.NaT
+
+    df["year"] = df["date"].dt.year
+
+    if "gender" in df.columns:
+        df["gender"] = df["gender"].apply(normalize_gender)
+    else:
+        df["gender"] = "Unknown"
+
+    if "course" in df.columns:
+        df["course"] = df["course"].apply(normalize_course)
+    else:
+        df["course"] = "Unknown"
+
+    if "distance" in df.columns:
+        df["distance"] = df["distance"].astype(str).str.replace(".0", "", regex=False)
+    else:
+        df["distance"] = df.get("event", "").apply(parse_distance_from_text)
+
+    if "stroke" not in df.columns:
+        df["stroke"] = df.get("event", "").apply(parse_stroke_from_text)
+
+    if "name" not in df.columns:
+        df["name"] = ""
+
+    if "nationality" not in df.columns:
+        df["nationality"] = "Unknown"
+
+    if "meet" not in df.columns:
+        df["meet"] = ""
+
+    if "location" not in df.columns:
+        df["location"] = ""
+
+    if "is_current" in df.columns:
+        df["is_current_bool"] = (
+            df["is_current"]
+            .astype(str)
+            .str.lower()
+            .str.strip()
+            .isin(["true", "1", "yes", "current"])
+        )
+    elif "iscurrent" in df.columns:
+        df["is_current_bool"] = (
+            df["iscurrent"]
+            .astype(str)
+            .str.lower()
+            .str.strip()
+            .isin(["true", "1", "yes", "current"])
+        )
+    else:
+        df["is_current_bool"] = False
+
+    df["event_label"] = (
+        df["gender"].astype(str)
+        + " "
+        + df["distance"].astype(str)
+        + "m "
+        + df["stroke"].astype(str)
+        + " ("
+        + df["course"].astype(str)
+        + ")"
+    ).apply(translate_event_label)
+
+    # Relay rows store four swimmers concatenated in a single "name" cell
+    # (e.g. "Steve Clark (52.9)Mike Austin..."). Flag them so athlete-level
+    # views can exclude them instead of treating the blob as one person.
+    if "event" in df.columns:
+        df["is_relay"] = df["event"].astype(str).str.contains("Relay", case=False, na=False)
+    else:
+        df["is_relay"] = False
+
+    df["athlete_key"] = np.where(df["is_relay"], "", df["name"].apply(athlete_key))
+
+    df = df.sort_values(["event_label", "date", "seconds"], ascending=[True, True, True])
+
+    return df
+
+
+@st.cache_data
+def load_top_performances():
+    if not TOP_FILE.exists():
+        return pd.DataFrame()
+
+    df = pd.read_excel(TOP_FILE)
+    df.columns = [snake_case(c) for c in df.columns]
+
+    for col in df.columns:
+        # pandas >= 3 returns StringDtype (not object) for text columns, so a
+        # plain object check would silently skip cleaning them.
+        if df[col].dtype == "object" or pd.api.types.is_string_dtype(df[col]):
+            df[col] = df[col].apply(clean_text)
+
+    desc_col = first_existing_column(df, ["event_description", "event_name", "event"])
+
+    time_col = first_existing_column(df, ["swim_time", "seconds", "time_seconds", "duration"])
+    if time_col:
+        df["time_seconds"] = df[time_col].apply(time_to_seconds)
+    else:
+        df["time_seconds"] = np.nan
+
+    date_col = first_existing_column(df, ["swim_date", "date"])
+    if date_col:
+        df["date"] = df[date_col].apply(parse_any_date)
+    else:
+        df["date"] = pd.NaT
+
+    df["year"] = df["date"].dt.year
+
+    if "rank_order" in df.columns:
+        df["rank"] = pd.to_numeric(df["rank_order"], errors="coerce")
+    elif "rank" in df.columns:
+        df["rank"] = pd.to_numeric(df["rank"], errors="coerce")
+    else:
+        df["rank"] = np.nan
+
+    if "athlete_full_name" in df.columns:
+        df["athlete"] = df["athlete_full_name"]
+    elif "name" in df.columns:
+        df["athlete"] = df["name"]
+    else:
+        df["athlete"] = ""
+
+    if "team_name" not in df.columns:
+        df["team_name"] = ""
+
+    if "team_code" not in df.columns:
+        df["team_code"] = ""
+
+    if "city" not in df.columns:
+        df["city"] = ""
+
+    if "country_code" not in df.columns:
+        df["country_code"] = ""
+
+    if "gender" in df.columns:
+        df["gender"] = df["gender"].apply(normalize_gender)
+    else:
+        df["gender"] = df[desc_col].apply(normalize_gender) if desc_col else "Unknown"
+
+    if desc_col:
+        df["distance"] = df[desc_col].apply(parse_distance_from_text)
+        df["stroke"] = df[desc_col].apply(parse_stroke_from_text)
+        df["course"] = df[desc_col].apply(lambda x: "LC" if "LCM" in clean_text(x).upper() else "SC" if "SCM" in clean_text(x).upper() else "Unknown")
+        df["event_label"] = df[desc_col].apply(translate_event_label)
+    else:
+        df["distance"] = ""
+        df["stroke"] = "Unknown"
+        df["course"] = "Unknown"
+        df["event_label"] = "Gara non disponibile"
+
+    df["time_label"] = df["time_seconds"].apply(format_time)
+
+    relay_source = df[desc_col] if desc_col else df["event_label"]
+    df["is_relay"] = relay_source.astype(str).str.contains("Relay|Staffetta", case=False, na=False, regex=True)
+    df["athlete_key"] = np.where(df["is_relay"], "", df["athlete"].apply(athlete_key))
+
+    df = df.sort_values(["event_label", "rank", "time_seconds"], ascending=[True, True, True])
+
+    return df
+
+
+wr = load_world_records()
+top = load_top_performances()
+
+
+# ============================================================
+# DATA CHECK
+# ============================================================
+
+missing_files = []
+
+if wr.empty:
+    missing_files.append(str(WR_FILE))
+
+if top.empty:
+    missing_files.append(str(TOP_FILE))
+
+if missing_files:
+    st.error(
+        "File mancanti o non leggibili: "
+        + ", ".join(missing_files)
+        + ". Inserisci i file Excel nella stessa cartella di app.py."
+    )
+    st.stop()
+
+
+# ============================================================
+# GAME FUNCTIONS - SWIM RECORD TOE
+# ============================================================
+
+def normalize_answer(value):
+    """Normalize swimmer names for robust answer checking."""
+    value = clean_text(value).lower()
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    value = re.sub(r"[^a-z0-9\s]", "", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
+def prepare_swim_game_data(df):
+    """Prepare world record data for the tic-tac-toe quiz."""
+    game_df = df.copy()
+
+    # Relay rows hold four swimmers in one cell, so they can never be a valid
+    # single-name answer in the quiz.
+    if "is_relay" in game_df.columns:
+        game_df = game_df[~game_df["is_relay"]].copy()
+
+    game_df = game_df[game_df["name"].astype(str).str.strip() != ""].copy()
+    game_df = game_df[game_df["event_label"].astype(str).str.strip() != ""].copy()
+
+    # Place criterion: location first, meet as fallback.
+    game_df["record_place"] = game_df["location"].astype(str).apply(clean_text)
+
+    if "meet" in game_df.columns:
+        game_df.loc[game_df["record_place"] == "", "record_place"] = (
+            game_df.loc[game_df["record_place"] == "", "meet"]
+            .astype(str)
+            .apply(clean_text)
+        )
+
+    game_df.loc[game_df["record_place"] == "", "record_place"] = "Luogo non disponibile"
+
+    # Decennio criterion.
+    game_df["year_numeric"] = pd.to_numeric(game_df["year"], errors="coerce")
+    game_df["decade"] = np.where(
+        game_df["year_numeric"].notna(),
+        ((game_df["year_numeric"] // 10) * 10).astype("Int64").astype(str) + "s",
+        "Decennio non disponibile"
+    )
+
+    # Compact event criterion, useful if event_label is too specific.
+    game_df["event_family"] = (
+        game_df["distance"].astype(str)
+        + "m "
+        + game_df["stroke"].astype(str)
+    ).apply(translate_event_label)
+
+    # Remove empty/useless criteria.
+    for col in ["record_place", "nationality", "decade", "course", "event_label", "event_family"]:
+        if col in game_df.columns:
+            game_df[col] = game_df[col].astype(str).apply(clean_text)
+            game_df = game_df[game_df[col] != ""]
+            game_df = game_df[game_df[col] != "Unknown"]
+
+    return game_df
+
+
+def build_swim_game_grid(game_df, row_col, col_col, min_answers=3, attempts=400):
+    """Build a 3x3 board where *every* cell has at least `min_answers` swimmers.
+
+    The old version accepted boards with empty intersections, which produced dead
+    "No data" cells: the board could never be filled, so a draw was impossible.
+    It also allowed cells with a single valid swimmer, which deadlocked the game
+    as soon as that swimmer had been used. Here the search is graded: it insists
+    on three answers per cell, then relaxes to two, then to one, and only gives
+    up if no board exists at all.
+    """
+    pair_counts = (
+        game_df.dropna(subset=[row_col, col_col, "name"])
+        .groupby([row_col, col_col])["name"]
+        .nunique()
+        .reset_index(name="valid_answers")
+    )
+
+    if pair_counts.empty:
+        return [], [], 0
+
+    for threshold in (min_answers, 2, 1):
+        eligible = pair_counts[pair_counts["valid_answers"] >= threshold]
+        if eligible.empty:
+            continue
+
+        matrix = eligible.pivot(index=row_col, columns=col_col, values="valid_answers").notna()
+        usable_rows = [r for r in matrix.index if matrix.loc[r].sum() >= 3]
+
+        if len(usable_rows) < 3:
+            continue
+
+        for _ in range(attempts):
+            rows = random.sample(usable_rows, 3)
+            shared_cols = [c for c in matrix.columns if matrix.loc[rows, c].all()]
+            if len(shared_cols) >= 3:
+                cols = random.sample(shared_cols, 3)
+                return rows, cols, threshold
+
+    return [], [], 0
+
+
+def get_cell_answers(game_df, row_value, col_value, row_col, col_col):
+    """Return all valid swimmers for a specific grid cell."""
+    cell_df = game_df[
+        (game_df[row_col].astype(str) == str(row_value))
+        & (game_df[col_col].astype(str) == str(col_value))
+    ].copy()
+
+    answers = (
+        cell_df["name"]
+        .dropna()
+        .astype(str)
+        .apply(clean_text)
+        .drop_duplicates()
+        .sort_values()
+        .tolist()
+    )
+
+    return answers
+
+
+def validate_swim_answer(game_df, answer, row_value, col_value, row_col, col_col):
+    """Check whether the submitted swimmer is valid for the selected cell."""
+    valid_answers = get_cell_answers(game_df, row_value, col_value, row_col, col_col)
+
+    if not valid_answers:
+        return False, None, []
+
+    normalized_map = {normalize_answer(name): name for name in valid_answers}
+    user_norm = normalize_answer(answer)
+
+    if user_norm in normalized_map:
+        return True, normalized_map[user_norm], valid_answers
+
+    close = get_close_matches(user_norm, list(normalized_map.keys()), n=1, cutoff=0.84)
+
+    if close:
+        return True, normalized_map[close[0]], valid_answers
+
+    return False, None, valid_answers
+
+
+WIN_LINES = [
+    [(0, 0), (0, 1), (0, 2)],
+    [(1, 0), (1, 1), (1, 2)],
+    [(2, 0), (2, 1), (2, 2)],
+    [(0, 0), (1, 0), (2, 0)],
+    [(0, 1), (1, 1), (2, 1)],
+    [(0, 2), (1, 2), (2, 2)],
+    [(0, 0), (1, 1), (2, 2)],
+    [(0, 2), (1, 1), (2, 0)],
+]
+
+
+def check_swim_game_winner(board):
+    """Return (winner, winning_line). Winner is a mark, "Pareggio", or None.
+
+    The winning line is returned so the board can be struck through, the way it
+    is done on paper.
+    """
+    for line in WIN_LINES:
+        marks = [board[i][j] for i, j in line]
+        if marks[0] != "" and marks[0] == marks[1] == marks[2]:
+            return marks[0], line
+
+    if all(board[i][j] != "" for i in range(3) for j in range(3)):
+        return "Pareggio", None
+
+    return None, None
+
+
+def swim_game_has_moves(game_df, rows, cols, row_col, col_col, board, used_names):
+    """True if at least one empty cell still has an unused valid swimmer.
+
+    Without this check the game could silently deadlock: every remaining cell
+    solvable only by swimmers who had already been named.
+    """
+    for i in range(3):
+        for j in range(3):
+            if board[i][j] != "":
+                continue
+            answers = get_cell_answers(game_df, rows[i], cols[j], row_col, col_col)
+            if any(normalize_answer(a) not in used_names for a in answers):
+                return True
+    return False
+
+
+def reset_swim_record_toe(game_df, row_col, col_col):
+    rows, cols, threshold = build_swim_game_grid(game_df, row_col, col_col)
+
+    st.session_state.swim_toe_rows = rows
+    st.session_state.swim_toe_cols = cols
+    st.session_state.swim_toe_threshold = threshold
+    st.session_state.swim_toe_board = [["" for _ in range(3)] for _ in range(3)]
+    st.session_state.swim_toe_answers = [["" for _ in range(3)] for _ in range(3)]
+    st.session_state.swim_toe_turn = "❌"
+    st.session_state.swim_toe_winner = None
+    st.session_state.swim_toe_win_line = None
+    st.session_state.swim_toe_selected = None
+    st.session_state.swim_toe_used_names = []
+    st.session_state.swim_toe_feedback = ""
+    st.session_state.swim_toe_feedback_kind = ""
+    st.session_state.swim_toe_hint = ""
+    st.session_state.swim_toe_misses = {"❌": 0, "⭕": 0}
+
+
+# ============================================================
+# NAVIGATION - SWIMMING POOL LANES
+# ============================================================
+
+PAGES = [
+    "Home",
+<<<<<<< HEAD
+    "Cronologia dei record mondiali",
+    "Top 200 di tutti i tempi",
+    "Galleria dei campioni",
+    "Nazioni e luoghi",
+    "Confronto tra gare",
+    "Dati e metodi",
+    "Gioco"
+]
+
+PAGE_LABELS = {
+    "Home": "Inizio",
+    "Cronologia dei record mondiali": "Cronologia",
+    "Top 200 di tutti i tempi": "Top 200",
+    "Galleria dei campioni": "Atleti",
+    "Nazioni e luoghi": "Nazioni",
+    "Confronto tra gare": "Confronta",
+    "Dati e metodi": "Dati",
+    "Gioco": "Gioco"
+}
+
+PAGE_TAGS = {
+    "Home": "Partenza",
+    "Cronologia dei record mondiali": "Evoluzione",
+    "Top 200 di tutti i tempi": "Élite mondiale",
+    "Galleria dei campioni": "Leggende",
+    "Nazioni e luoghi": "Mappe e paesi",
+    "Confronto tra gare": "Sfida tra gare",
+    "Dati e metodi": "Dietro i dati",
+    "Gioco": "Gioca e indovina"
+=======
+    "World Record Timeline",
+    "Current World Records",
+    "All-Time Top 200 Rankings",
+    "Athletes Hall of Fame",
+    "Nations & Places",
+    "Compare Events",
+    "Data & Methods"
+]
+
+PAGE_LABELS = {
+    "Home": "Home",
+    "World Record Timeline": "Timeline",
+    "Current World Records": "Records",
+    "All-Time Top 200 Rankings": "Top 200",
+    "Athletes Hall of Fame": "Athletes",
+    "Nations & Places": "Nations",
+    "Compare Events": "Compare",
+    "Data & Methods": "Methods"
+}
+
+PAGE_TAGS = {
+    "Home": "Start block",
+    "World Record Timeline": "Record flow",
+    "Current World Records": "Gold lane",
+    "All-Time Top 200 Rankings": "Elite depth",
+    "Athletes Hall of Fame": "Legends",
+    "Nations & Places": "Maps & flags",
+    "Compare Events": "Race match",
+    "Data & Methods": "Behind data"
+>>>>>>> parent of 429c99e (gioco)
+}
+
+# Read selected page from the URL.
+# Example: ?page=World%20Record%20Timeline
+query_page = st.query_params.get("page", "Home")
+
+if isinstance(query_page, list):
+    query_page = query_page[0]
+
+page = query_page if query_page in PAGES else "Home"
+
+
+# ------------------------------------------------------------
+# Shared builder for the pool lanes.
+# The SAME lanes are used both for the full-page pool on the Home
+# and for the small (sticky) pool shown on every other page, so
+# navigation always keeps the identical style.
+# Keep it as ONE compact HTML string: no multi-line indented HTML,
+# otherwise Streamlit renders it as a code block.
+# ------------------------------------------------------------
+
+def build_pool_lanes():
+    lanes = ""
+    for i, page_name in enumerate(PAGES, start=1):
+        active_class = " active" if page == page_name else ""
+        page_url = quote(page_name, safe="")
+        link_target = "_blank" if page_name == "Gioco" else "_self"
+        lanes += (
+            f'<a class="home-lane{active_class}" href="?page={page_url}" target="{link_target}">'
+            f'<span class="hl-line"></span>'
+            f'<span class="hl-btn">'
+            f'<span class="hl-name">{PAGE_LABELS[page_name]}</span>'
+            f'<span class="hl-tag">{PAGE_TAGS[page_name]}</span>'
+            f'</span>'
+            f'<span class="hl-num">{i}</span>'
+            f'</a>'
+        )
+    # Rope separators on the exact lane boundaries (absolute, the grid ignores them).
+    lanes += '<span class="pool-rope"></span>' * 7
+    return lanes
+
+
+# ------------------------------------------------------------
+# Brand logo (inline SVG): a stopwatch — for records/times — whose
+# dial holds swimming waves, with a gold hand and crown (achievement).
+# Recalls both swimming and records.
+# ------------------------------------------------------------
+
+LOGO_SVG = (
+    '<svg class="brand-logo" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">'
+    '<defs><linearGradient id="swlg" x1="0" y1="0" x2="1" y2="1">'
+    '<stop offset="0" stop-color="#0C4A5A"/>'
+    '<stop offset="0.55" stop-color="#1B6E7E"/>'
+    '<stop offset="1" stop-color="#22B8CF"/>'
+    '</linearGradient></defs>'
+    '<rect x="1" y="1" width="46" height="46" rx="13" fill="url(#swlg)"/>'
+    # stopwatch crown + gold button
+    '<rect x="21.5" y="5.5" width="5" height="4.6" rx="1.6" fill="#FFFFFF"/>'
+    '<circle cx="24" cy="4.2" r="2.6" fill="#C9A24B"/>'
+    # dial
+    '<circle cx="24" cy="28" r="14" fill="#FFFFFF"/>'
+    # swimming waves inside the dial
+    '<path d="M13 33 q2.75 -3.2 5.5 0 t5.5 0 t5.5 0" fill="none" '
+    'stroke="#0C4A5A" stroke-width="2.2" stroke-linecap="round"/>'
+    '<path d="M14.5 37 q2.4 -2.8 4.8 0 t4.8 0 t4.8 0" fill="none" '
+    'stroke="#1B6E7E" stroke-width="1.8" stroke-linecap="round" opacity="0.55"/>'
+    # timer hand + pin (record accent)
+    '<path d="M24 28 L24 16.5" fill="none" stroke="#C9A24B" '
+    'stroke-width="2.6" stroke-linecap="round"/>'
+    '<circle cx="24" cy="28" r="1.9" fill="#C9A24B"/>'
+    '</svg>'
+)
+
+
+def brand_html(tagline):
+    """Logo + title + small uppercase tagline, reused on every header."""
+    return (
+        '<div class="brand">'
+        f'{LOGO_SVG}'
+        '<div class="brand-text">'
+        '<div class="home-pool-title">Esplora i record del nuoto</div>'
+        f'<div class="brand-tag">{tagline}</div>'
+        '</div>'
+        '</div>'
+    )
+
+
+def home_stats_html():
+    """Scoreboard-style chips with a few real numbers from the datasets."""
+    names = set(wr.loc[wr["athlete_key"] != "", "athlete_key"]) | set(
+        top.loc[top["athlete_key"] != "", "athlete_key"]
+    )
+    names = {n for n in names if n}
+
+    chips = [
+        (len(wr), "Record mondiali"),
+        (wr["event_label"].nunique(), "Gare"),
+        (len(names), "Atleti"),
+        (wr["nationality"].nunique(), "Nazioni"),
+    ]
+
+    inner = ""
+    for num, lab in chips:
+        inner += (
+            f'<div class="pool-stat">'
+            f'<span class="ps-num">{num}</span>'
+            f'<span class="ps-lab">{lab}</span>'
+            f'</div>'
+        )
+    return f'<div class="pool-stats">{inner}</div>'
+
+
+POOL_FOOT = (
+    '<div class="pool-foot">'
+    '<span><i style="background:#0A6C9F"></i>Vasca lunga</span>'
+    '<span><i style="background:#22B8CF"></i>Vasca corta</span>'
+    '<span><i style="background:#D6A937"></i>Record attuale</span>'
+    '</div>'
+)
+
+
+# ------------------------------------------------------------
+# Swim photos.
+# Drop image files into an "assets/" folder next to this script
+# (e.g. assets/hero.jpg). If the file is missing, a clean themed
+# placeholder is shown instead, so the layout never breaks.
+# ------------------------------------------------------------
+
+ASSETS_DIR = Path("assets")
+
+
+def _img_data_uri(path):
+    ext = path.suffix.lower().lstrip(".")
+    mime = "jpeg" if ext in ("jpg", "jpeg") else ext
+    data = base64.b64encode(path.read_bytes()).decode()
+    return f"data:image/{mime};base64,{data}"
+
+
+def swim_figure(filename, alt="Nuoto", ratio="62%", radius=20):
+    """Return an HTML figure for a swim photo in assets/, or a placeholder."""
+    path = ASSETS_DIR / filename
+
+    if path.exists():
+        inner = (
+            f'<img src="{_img_data_uri(path)}" alt="{alt}" '
+            f'style="object-fit:cover;display:block;"/>'
+        )
+        ph_class = ""
+    else:
+        inner = f'<div class="img-ph-label">Aggiungi <b>assets/{filename}</b><br>{alt}</div>'
+        ph_class = " is-placeholder"
+
+    return (
+        f'<div class="swim-figure{ph_class}" style="border-radius:{radius}px;">'
+        f'<div class="swim-figure-inner" style="padding-top:{ratio};">{inner}</div>'
+        f'</div>'
+    )
+
+
+def page_header(title, subtitle="", image_file=None, alt="Nuoto", ratio="120%"):
+    """Section header. With an image it becomes a two-column 'title beside photo'
+    layout like an editorial spread; without one it falls back to a plain title."""
+    if image_file is None:
+        section(title, subtitle)
+        return
+
+    col_txt, col_img = st.columns([1.45, 1], gap="large")
+
+    with col_txt:
+        st.markdown(f"<div class='section-title'>{title}</div>", unsafe_allow_html=True)
+        st.markdown("<div class='wave-rule'></div>", unsafe_allow_html=True)
+        if subtitle:
+            st.markdown(f"<div class='section-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+
+    with col_img:
+        st.markdown(swim_figure(image_file, alt, ratio=ratio), unsafe_allow_html=True)
+
+
+def render_home_head():
+    """Full-bleed cinematic Home hero (dark poster style): dark swim photo,
+    big skewed white title, cyan tagline, tilted photo cards and chevrons."""
+
+    def uri(name):
+        p = ASSETS_DIR / name
+        return _img_data_uri(p) if p.exists() else ""
+
+    bg = uri("home_side.jpg")
+    c1 = uri("athletes.jpg")
+    c2 = uri("nations.jpg")
+
+    bg_html = f'<div class="cine-bg"><img src="{bg}" alt=""/></div>' if bg else ''
+    card1 = f'<div class="cine-card c1"><img src="{c1}" alt=""/></div>' if c1 else ''
+    card2 = f'<div class="cine-card c2"><img src="{c2}" alt=""/></div>' if c2 else ''
+    cards = f'<div class="cine-cards">{card1}{card2}</div>' if (c1 or c2) else '<div></div>'
+
+    html = (
+        '<div class="fullbleed home-cine">'
+        f'{bg_html}'
+        '<div class="cine-overlay"></div>'
+        '<div class="cine-chev tr">&#187;&#187;&#187;&#187;&#187;</div>'
+        '<div class="cine-chev br">&#187;&#187;&#187;&#187;&#187;</div>'
+        '<div class="cine-inner">'
+        '<div class="cine-text">'
+        f'<div class="cine-kicker">{LOGO_SVG}<span>Record mondiali &middot; Classifiche &middot; Atleti &middot; Nazioni</span></div>'
+        '<h1 class="cine-title">Esplora i <span class="gold">record</span><br>del nuoto</h1>'
+        '<div class="cine-tag">'
+        'Tuffati nella storia dei record '
+        '<span class="chev">&#187;&#187;&#187;</span>'
+        '</div>'
+        '<p class="cine-desc">'
+        'Un secolo di <b>record mondiali</b> ufficiali, classifiche <b>top 200</b> di sempre e '
+        'gli atleti, le nazioni e le piscine dietro ogni primato — con un gioco per metterti alla prova. '
+        'Scegli una corsia qui sotto e inizia l’esplorazione.'
+        '</p>'
+        '</div>'
+        f'{cards}'
+        '</div>'
+        '</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_compact_pool(active_page):
+    """Little pool used as the header/navigation on inner pages."""
+    html = (
+        '<div class="mini-pool">'
+        '<div class="mini-pool-head">'
+        f'<span class="mini-pool-brand">{LOGO_SVG}<span>Record del nuoto</span></span>'
+        f'<span class="mini-pool-current">Sezione: <b>{PAGE_LABELS[active_page]}</b></span>'
+        '</div>'
+        f'<div class="home-lanes mini">{build_pool_lanes()}</div>'
+        '</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+# Inner pages get the little pool as their header; the Home builds its own below.
+if page != "Home":
+    render_compact_pool(page)
+
+
+if page in ("Cronologia dei record mondiali", "Top 200 di tutti i tempi", "Nazioni e luoghi", "Confronto tra gare"):
+    with st.sidebar:
+        st.markdown("## 🏊 Filtri")
+
+
+# ============================================================
+# PAGE 1 - HOME
+# ============================================================
+
+if page == "Home":
+
+    # The sidebar has no purpose on the Home — hide it completely here.
+    st.markdown(
+        "<style>"
+        "section[data-testid='stSidebar']{display:none !important;}"
+        "div[data-testid='stSidebarCollapsedControl']{display:none !important;}"
+        "[data-testid='collapsedControl']{display:none !important;}"
+        "button[data-testid='stSidebarCollapseButton']{display:none !important;}"
+        "</style>",
+        unsafe_allow_html=True
+    )
+
+    # Intestazione principale, ottimizzata anche per smartphone.
+    render_home_head()
+
+    # The pool is the only navigation: eight lanes filling the page.
+    st.markdown(
+        f'<div class="fullbleed"><div class="home-lanes">{build_pool_lanes()}</div></div>',
+        unsafe_allow_html=True
+    )
+
+    # Glossary: the acronyms used across every page, explained once, up front.
+    glossary = [
+        ("LC", "Vasca lunga. Gare disputate in una piscina olimpica da 50 metri. I tempi sono "
+               "solitamente più alti perché ci sono meno virate e spinte dal muro."),
+        ("SC", "Vasca corta. Gare disputate in una piscina da 25 metri. Più virate significano "
+               "più spinte dal muro, quindi i tempi sono generalmente più bassi rispetto alla vasca lunga."),
+        ("WR", "Record mondiale. Il tempo più veloce mai riconosciuto ufficialmente in una gara. "
+               "I record sono separati tra vasca lunga e vasca corta."),
+        ("IM", "Misti individuali. Un atleta nuota tutti e quattro gli stili nella stessa gara, "
+               "nell’ordine: farfalla, dorso, rana e stile libero."),
+        ("Staffetta", "Gara a squadre: quattro atleti nuotano una frazione ciascuno. I record di staffetta "
+                     "appartengono alla squadra e sono esclusi dalle pagine individuali degli atleti."),
+        ("Top 200", "Le 200 prestazioni più veloci mai registrate in una gara. A differenza del record "
+                    "mondiale, lo stesso atleta può comparire più volte."),
+    ]
+
+    items = "".join(
+        f"<div class='glossary-item'><div class='glossary-term'>{term}</div>"
+        f"<div class='glossary-def'>{definition}</div></div>"
+        for term, definition in glossary
+    )
+
+    st.markdown(
+        "<div class='glossary-wrap'>"
+        "<div class='glossary-title'>Come leggere i dati</div>"
+        "<div class='glossary-intro'>Alcune abbreviazioni compaiono in tutto il sito. "
+        "Ecco cosa significano.</div>"
+        f"<div class='glossary-grid'>{items}</div>"
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+
+# ============================================================
+# PAGE 2 - WORLD RECORD TIMELINE
+# ============================================================
+
+elif page == "Cronologia dei record mondiali":
+
+    # --- Editorial header: identical markup to page_header so it matches other sections ---
+    col_txt, col_img = st.columns([1.45, 1], gap="large")
+
+    with col_txt:
+        st.markdown("<div class='section-title'>Cronologia dei record mondiali</div>", unsafe_allow_html=True)
+        st.markdown("<div class='wave-rule'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-subtitle'>Segui l’evoluzione del record mondiale ufficiale di ogni "
+            "gara. Nel nuoto, meno secondi significano una prestazione migliore.</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div class=\"fact-box\">"
+            "<div class=\"fact-kicker\">Lo sapevi?</div>"
+            "<div class=\"fact-text\">Ai primi Giochi olimpici moderni di <b>Atene 1896</b>, "
+            "le gare di nuoto non si svolsero in piscina: furono disputate nelle acque aperte della "
+            "<b>baia di Zea</b>, con una temperatura riportata di circa <b>13&deg;C</b>. Dalle fredde "
+            "acque aperte alle piscine controllate di oggi, ogni record racconta un passo "
+            "nell’evoluzione della velocità nel nuoto.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    with col_img:
+        st.markdown(
+            swim_figure("timeline.jpg", alt="Partenza storica di una gara olimpica di nuoto", ratio="70%"),
+            unsafe_allow_html=True,
+        )
+
+    filtered = apply_common_filters(
+        wr,
+        gender=True,
+        course=True,
+        stroke=True,
+        distance=True,
+        key_prefix="timeline"
+    )
+
+    if filtered.empty:
+        st.warning("Nessun dato disponibile con i filtri selezionati.")
+        st.stop()
+
+    # On-page hint so users notice the sidebar filters (same as Nazioni & Places).
+    st.info(
+        "Usa i **Filtri** nel menu laterale (genere, vasca, stile e distanza): "
+        "il grafico e la tabella si aggiornano in tempo reale."
+    )
+
+    available_events = safe_unique(filtered["event_label"])
+
+    st.markdown("<div class='timeline-control-row'>", unsafe_allow_html=True)
+
+    selector_col, record_col = st.columns([1, 1.45], gap="large")
+
+    with selector_col:
+        selected_event = st.selectbox(
+            "Scegli una gara da esplorare",
+            available_events,
+            index=0 if available_events else None,
+            key="timeline_event_selector"
+        )
+
+        st.markdown(
+            "<div class=\"timeline-selector-note\">Seleziona una gara e ripercorri tutte le tappe "
+            "che hanno portato al record mondiale attuale.</div>",
+            unsafe_allow_html=True,
+        )
+
+    data = filtered[filtered["event_label"] == selected_event].copy()
+    data = data.dropna(subset=["seconds"]).sort_values("date")
+
+    if data.empty:
+        st.warning("Nessun dato disponibile per la gara selezionata.")
+        st.stop()
+
+    current_rows = data[data["is_current_bool"] == True].copy()
+
+    if not current_rows.empty:
+        current_record = current_rows.sort_values("date").iloc[-1]
+    else:
+        current_record = data.sort_values("date").iloc[-1]
+
+    first_record = data.iloc[0]
+    improvement = first_record["seconds"] - current_record["seconds"]
+    improvement_pct = improvement / first_record["seconds"] * 100 if first_record["seconds"] else np.nan
+
+    current_time = clean_text(current_record["time"])
+    current_name = clean_text(current_record["name"])
+    current_nat = clean_text(current_record["nationality"])
+    current_meet = clean_text(current_record["meet"])
+    current_location = clean_text(current_record["location"])
+
+    current_date_label = format_date_it(current_record["date"])
+
+    with record_col:
+        st.markdown(
+            f"<div class=\"timeline-record-card\">"
+            f"<div class=\"timeline-record-kicker\">Record mondiale attuale</div>"
+            f"<div class=\"timeline-record-main\">{current_time} &middot; {current_name}</div>"
+            f"<div class=\"timeline-record-sub\">{selected_event}<br>"
+            f"{current_nat} &middot; {current_date_label} &middot; {current_meet} &middot; {current_location}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Metrics: 3 columns (the long event name lived here before and got truncated with "…").
+    st.markdown("<div class='timeline-metrics-row'>", unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.metric("Record registrati", len(data))
+
+    with c2:
+        st.metric("Miglioramento totale", f"{improvement:.2f} s")
+
+    with c3:
+        st.metric("Miglioramento", f"{improvement_pct:.1f}%")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='timeline-chart-spacer'></div>", unsafe_allow_html=True)
+
+    chart_data = data.copy()
+
+    chart_data["date_label"] = chart_data["date"].apply(format_date_it)
+
+    for col in ["event_label", "time", "name", "nationality", "meet", "location", "course"]:
+        chart_data[col] = chart_data[col].astype(str).apply(clean_text)
+        chart_data.loc[chart_data[col] == "", col] = "—"
+
+    chart_data["current_point"] = chart_data.index == current_record.name
+
+    custom_cols = [
+        "event_label",
+        "time",
+        "date_label",
+        "name",
+        "nationality",
+        "meet",
+        "location",
+        "course"
+    ]
+
+    chart_title = (
+        f"<b>{selected_event}</b><br>"
+        f"<span style='font-size:14px;color:#52616B'>"
+        f"Record mondiale attuale: <b>{current_time}</b> · {current_name} · {current_nat} · {current_date_label}"
+        f"</span>"
+    )
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=chart_data["date"],
+            y=chart_data["seconds"],
+            mode="lines+markers",
+            name="Evoluzione del record mondiale",
+            line=dict(color=BLUE, width=3),
+            marker=dict(
+                size=8,
+                color=BLUE,
+                line=dict(color="white", width=1.4)
+            ),
+            customdata=chart_data[custom_cols].to_numpy(),
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br><br>"
+                "Tempo: <b>%{customdata[1]}</b> (%{y:.2f} s)<br>"
+                "Data: %{customdata[2]}<br>"
+                "Atleta: %{customdata[3]}<br>"
+                "Nazionalità: %{customdata[4]}<br>"
+                "Vasca: %{customdata[7]}<br>"
+                "Competizione: %{customdata[5]}<br>"
+                "Luogo: %{customdata[6]}"
+                "<extra></extra>"
+            )
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=[current_record["date"]],
+            y=[current_record["seconds"]],
+            mode="markers+text",
+            name="Record attuale",
+            marker=dict(
+                size=21,
+                color=GOLD,
+                symbol="star",
+                line=dict(color="white", width=1.5)
+            ),
+            text=["Record attuale"],
+            textposition="top center",
+            customdata=pd.DataFrame(
+                [[
+                    selected_event,
+                    current_time,
+                    current_date_label,
+                    current_name,
+                    current_nat,
+                    current_meet,
+                    current_location,
+                    clean_text(current_record["course"])
+                ]],
+                columns=custom_cols
+            ).to_numpy(),
+            hovertemplate=(
+                "<b>Record mondiale attuale</b><br><br>"
+                "Gara: %{customdata[0]}<br>"
+                "Tempo: <b>%{customdata[1]}</b> (%{y:.2f} s)<br>"
+                "Data: %{customdata[2]}<br>"
+                "Atleta: %{customdata[3]}<br>"
+                "Nazionalità: %{customdata[4]}<br>"
+                "Vasca: %{customdata[7]}<br>"
+                "Competizione: %{customdata[5]}<br>"
+                "Luogo: %{customdata[6]}"
+                "<extra></extra>"
+            )
+        )
+    )
+
+    fig.add_hline(
+        y=current_record["seconds"],
+        line_dash="dot",
+        line_color=GOLD,
+        opacity=0.75,
+        annotation_text=f"Record attuale · {current_time}",
+        annotation_position="top left",
+        annotation_font=dict(color=GOLD, size=12)
+    )
+
+    fig.update_layout(
+        title=dict(
+            text=chart_title,
+            x=0.02,
+            xanchor="left"
+        )
+    )
+
+    fig.update_xaxes(
+        title="Anno del record mondiale",
+        tickformat="%Y"
+    )
+
+    fig.update_yaxes(
+        autorange="reversed",
+        title="Tempo in secondi — più basso è meglio"
+    )
+
+    fig = plotly_clean_layout(fig, height=650)
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+    )
+
+    st.markdown(
+        "<div class=\"small-caption\">Nota di lettura: l’asse verticale è invertito perché nel nuoto "
+        "un tempo più basso indica una prestazione migliore. Il simbolo dorato evidenzia il record "
+        "mondiale attuale.</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.dataframe(
+        data[
+            ["date", "time", "seconds", "name", "nationality", "meet", "location", "is_current_bool"]
+        ].rename(
+            columns={
+                "date": "Data",
+                "time": "Tempo",
+                "seconds": "Secondi",
+                "name": "Atleta",
+                "nationality": "Nazionalità",
+                "meet": "Competizione",
+                "location": "Luogo",
+                "is_current_bool": "Record attuale"
+            }
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+
+<<<<<<< HEAD
+=======
+
+# ============================================================
+# PAGE 3 - CURRENT WORLD RECORDS
+# ============================================================
+
+elif page == "Current World Records":
+
+    section(
+        "Current World Records",
+        "A clean overview of the records that currently define the limit of swimming performance."
+    )
+
+    current = wr[wr["is_current_bool"] == True].copy()
+
+    filtered = apply_common_filters(
+        current,
+        gender=True,
+        course=True,
+        stroke=True,
+        distance=True,
+        key_prefix="current"
+    )
+
+    if filtered.empty:
+        st.warning("No current records available for the selected filters.")
+        st.stop()
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.metric("Current records shown", len(filtered))
+
+    with c2:
+        st.metric("Athletes", filtered["name"].nunique())
+
+    with c3:
+        st.metric("Nations", filtered["nationality"].nunique())
+
+    with c4:
+        newest_year = int(filtered["year"].max()) if filtered["year"].notna().any() else "-"
+        st.metric("Most recent record year", newest_year)
+
+    st.markdown(
+        """
+        <div class="warning-box">
+        Direct time comparison across different distances is not analytically fair.
+        Use filters to compare similar events, or read this page as a lookup view of current records.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    display = filtered.copy()
+    display["label"] = display["event_label"] + " — " + display["name"]
+
+    fig = px.bar(
+        display.sort_values("seconds", ascending=True),
+        x="seconds",
+        y="label",
+        orientation="h",
+        color="gender",
+        color_discrete_map=GENDER_COLORS,
+        hover_data=["time", "nationality", "meet", "location", "date"],
+        title="Current world records selected"
+    )
+    fig.update_layout(yaxis=dict(autorange="reversed"))
+    fig.update_xaxes(title="Time in seconds")
+    fig.update_yaxes(title="")
+    fig = plotly_clean_layout(fig, height=max(420, 26 * len(display)))
+    st.plotly_chart(fig, use_container_width=True)
+
+    table_cols = [
+        "event_label", "time", "seconds", "name", "nationality",
+        "date", "meet", "location"
+    ]
+
+    st.dataframe(
+        filtered[table_cols].rename(
+            columns={
+                "event_label": "Event",
+                "time": "Time",
+                "seconds": "Seconds",
+                "name": "Athlete",
+                "nationality": "Nationality",
+                "date": "Date",
+                "meet": "Meet",
+                "location": "Location"
+            }
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+>>>>>>> parent of 429c99e (gioco)
+# ============================================================
+# PAGE 4 - ALL-TIME TOP 200 RANKINGS
+# ============================================================
+
+elif page == "Top 200 di tutti i tempi":
+
+    page_header(
+        "Top 200 di tutti i tempi",
+        "Un record mondiale è un singolo tempo, ottenuto da un atleta in un giorno preciso. "
+        "La top 200 racconta invece quanto sia affollato il vertice: in molte gare, le 200 prestazioni "
+        "più veloci della storia sono separate da pochissimi secondi. Questa pagina mostra la profondità "
+        "dell’élite, quando sono stati ottenuti i tempi e quali atleti riescono a ripetersi.",
+        image_file="top200.jpg",
+        alt="Vista subacquea di alcuni nuotatori",
+        ratio="70%"
+    )
+
+    filtered = apply_common_filters(
+        top,
+        gender=True,
+        course=True,
+        stroke=True,
+        distance=True,
+        key_prefix="top"
+    )
+
+    with st.sidebar:
+        st.markdown("### Selezione della classifica")
+
+        events = safe_unique(filtered["event_label"])
+        selected_event = st.selectbox(
+            "Scegli la gara",
+            events,
+            index=0 if events else None,
+            key="top_event"
+        )
+
+        max_rank = int(filtered["rank"].max()) if filtered["rank"].notna().any() else 200
+        slider_max = max(5, min(200, max_rank))
+        rank_limit = st.slider(
+            "Righe da mostrare nella tabella",
+            min_value=5,
+            max_value=slider_max,
+            value=min(30, slider_max),
+            step=5
+        )
+
+    st.info(
+        "Usa i pannelli **Filtri** e **Selezione della classifica** nel menu laterale per cambiare "
+        "gara: tutti i grafici si aggiornano in tempo reale."
+    )
+
+    # The distribution charts always use the full ranking; only the table is trimmed.
+    event_data = filtered[filtered["event_label"] == selected_event].dropna(subset=["time_seconds"]).copy()
+
+    if event_data.empty:
+        st.warning("Nessun dato di classifica disponibile con i filtri selezionati.")
+        st.stop()
+
+    event_data = event_data.sort_values(["rank", "time_seconds"])
+    event_data["year"] = event_data["date"].dt.year
+
+    table_data = event_data[event_data["rank"] <= rank_limit].copy()
+
+    best_time = event_data["time_seconds"].min()
+    slowest_time = event_data["time_seconds"].max()
+    field_spread = slowest_time - best_time
+    best_row = event_data.iloc[0]
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.metric("Miglior tempo di sempre", format_time(best_time))
+
+    with c2:
+        st.metric("Ampiezza della top 200", f"{field_spread:.2f} s")
+
+    with c3:
+        st.metric("Atleti diversi", event_data["athlete"].nunique())
+
+    with c4:
+        st.metric("Nazioni diverse", event_data["team_name"].nunique())
+
+    # ------------------------------------------------------------------
+    # 1. HOW TIGHT IS THE FIELD?  Box-and-whisker with every swim drawn on top.
+    #    Each dot is one performance: nothing is aggregated away, and position
+    #    along a common axis is the most accurately read visual channel.
+    # ------------------------------------------------------------------
+    st.markdown("### Quanto è compatta l’élite?")
+    st.caption(
+        f"Le {len(event_data)} prestazioni più veloci mai registrate in questa gara, disposte su un "
+        f"unico asse temporale. Il box contiene la metà centrale dei valori; i baffi coprono il resto. "
+        f"Ogni punto è una prestazione: toccalo o passaci sopra per scoprire l’atleta."
+    )
+
+    swarm = go.Figure()
+    swarm.add_trace(go.Box(
+        x=event_data["time_seconds"],
+        name="",
+        boxpoints="all",
+        jitter=0.6,
+        pointpos=0,
+        marker=dict(color=BLUE, size=6, opacity=0.55),
+        line=dict(color=NAVY),
+        fillcolor="rgba(34,184,207,0.18)",
+        customdata=np.stack(
+            [event_data["athlete"], event_data["time_label"], event_data["rank"], event_data["team_name"]],
+            axis=-1
+        ),
+        hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]} · posizione %{customdata[2]}"
+                      "<br>%{customdata[3]}<extra></extra>",
+        showlegend=False,
+    ))
+    swarm.add_trace(go.Scatter(
+        x=[best_time],
+        y=[0],
+        mode="markers",
+        marker=dict(color=GOLD, size=18, symbol="star", line=dict(color="white", width=1.4)),
+        name="Miglior tempo di sempre",
+        hovertemplate=f"<b>{clean_text(best_row['athlete'])}</b><br>"
+                      f"{clean_text(best_row['time_label'])} · miglior tempo di sempre<extra></extra>",
+    ))
+    swarm.update_xaxes(title="Tempo in secondi — più a sinistra è più veloce")
+    swarm.update_yaxes(showticklabels=False, title="")
+    swarm = plotly_clean_layout(swarm, height=360, title=f"{selected_event}")
+    st.plotly_chart(
+            swarm,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+    st.markdown(
+        f"<div class='small-caption'>La stella dorata indica la prestazione più veloce di sempre in questa gara "
+        f"({clean_text(best_row['athlete'])}, {clean_text(best_row['time_label'])}). Tutte le altre "
+        f"prestazioni si concentrano subito dietro: la 200ª più veloce della storia è soltanto "
+        f"<b>{field_spread:.2f} secondi</b> più lenta. Barre o intervalli nasconderebbero questa "
+        f"concentrazione, quindi ogni prestazione è rappresentata singolarmente.</div>",
+        unsafe_allow_html=True
+    )
+
+    # ------------------------------------------------------------------
+    # 2. WHEN were these swims performed?
+    # ------------------------------------------------------------------
+    st.markdown("### Quando sono state ottenute queste prestazioni?")
+
+    suit_era = event_data[event_data["year"].between(2008, 2009)]
+    suit_share = len(suit_era) / len(event_data) * 100 if len(event_data) else 0
+
+    st.caption(
+        "Ogni punto rappresenta una delle prestazioni viste sopra, ora collocata nella data in cui "
+        "è stata ottenuta. Una nuvola piatta indica pochi cambiamenti; una discesa mostra che "
+        "l’intera élite è diventata più veloce."
+    )
+
+    era = go.Figure()
+    era.add_trace(go.Scatter(
+        x=event_data["date"],
+        y=event_data["time_seconds"],
+        mode="markers",
+        marker=dict(color=BLUE, size=7, opacity=0.65, line=dict(color="white", width=0.6)),
+        customdata=np.stack([event_data["athlete"], event_data["time_label"], event_data["rank"]], axis=-1),
+        hovertemplate="<b>%{customdata[0]}</b><br>%{customdata[1]} · posizione %{customdata[2]}"
+                      "<br>%{x|%d %b %Y}<extra></extra>",
+        showlegend=False,
+    ))
+    era.add_vrect(
+        x0="2008-01-01", x1="2009-12-31",
+        fillcolor=GOLD, opacity=0.16, line_width=0,
+        annotation_text="Costumi in poliuretano", annotation_position="top left",
+        annotation_font=dict(color=DARK_GREY, size=12),
+    )
+    era.update_xaxes(title="Data della prestazione")
+    era.update_yaxes(autorange="reversed", title="Tempo in secondi — più basso è meglio")
+    era = plotly_clean_layout(era, height=440, title="La top 200 di sempre nel tempo")
+    st.plotly_chart(
+            era,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+    st.markdown(
+        f"<div class='small-caption'>La fascia evidenziata indica il 2008–2009, periodo in cui i "
+        f"costumi integrali in poliuretano erano consentiti; furono vietati dal 2010. In questa gara "
+        f"<b>{len(suit_era)} delle {len(event_data)} migliori prestazioni di sempre ({suit_share:.0f}%)</b> "
+        f"provengono soltanto da quelle due stagioni. La classifica registra quindi non solo l’atleta, "
+        f"ma anche le condizioni tecnologiche della prestazione.</div>",
+        unsafe_allow_html=True
+    )
+
+    # ------------------------------------------------------------------
+    # 3. WHO recurs, and WHICH nations have depth?
+    # ------------------------------------------------------------------
+    st.markdown("### Chi raggiunge la top 200 e chi ci riesce più volte")
+    st.caption(
+        "A sinistra, gli atleti con più prestazioni nella top 200: la profondità premia chi si "
+        "ripete, non soltanto chi detiene un record. A destra, la stessa domanda applicata alle "
+        "nazioni: un box corto indica tempi concentrati vicino al vertice."
+    )
+
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        athlete_counts = (
+            event_data.groupby("athlete")
+            .size()
+            .reset_index(name="entries")
+            .sort_values("entries", ascending=False)
+            .head(12)
+        )
+
+        fig_ath = px.bar(
+            athlete_counts,
+            x="entries",
+            y="athlete",
+            orientation="h",
+            color_discrete_sequence=[BLUE],
+        )
+        fig_ath.update_layout(yaxis=dict(autorange="reversed"), showlegend=False)
+        fig_ath.update_xaxes(title="Prestazioni nella top 200")
+        fig_ath.update_yaxes(title="")
+        fig_ath = plotly_clean_layout(fig_ath, height=460, title="Atleti più presenti")
+        st.plotly_chart(
+            fig_ath,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+    with col_b:
+        nation_order = event_data["team_name"].value_counts().head(6).index.tolist()
+        nation_data = event_data[event_data["team_name"].isin(nation_order)]
+
+        fig_nat = px.box(
+            nation_data,
+            x="time_seconds",
+            y="team_name",
+            orientation="h",
+            category_orders={"team_name": nation_order},
+            color_discrete_sequence=[AQUA],
+            points="all",
+        )
+        fig_nat.update_traces(marker=dict(size=5, opacity=0.5, color=BLUE), line=dict(color=NAVY))
+        fig_nat.update_layout(showlegend=False)
+        fig_nat.update_xaxes(title="Tempo in secondi — più a sinistra è più veloce")
+        fig_nat.update_yaxes(title="")
+        fig_nat = plotly_clean_layout(fig_nat, height=460, title="Le nazioni con maggiore profondità")
+        st.plotly_chart(
+            fig_nat,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+    # ------------------------------------------------------------------
+    # 4. The exact numbers. A table is the right tool for looking up a value.
+    # ------------------------------------------------------------------
+    st.markdown(f"### Le prime {len(table_data)} posizioni nel dettaglio")
+    st.caption(
+        "I grafici mostrano la distribuzione; la tabella riporta i valori esatti. Usa il cursore nel menu laterale per estendere l’elenco."
+    )
+
+    st.dataframe(
+        table_data[
+            [
+                "rank", "athlete", "time_label", "time_seconds",
+                "team_name", "team_code", "date", "city", "country_code"
+            ]
+        ].rename(
+            columns={
+                "rank": "Posizione",
+                "athlete": "Atleta",
+                "time_label": "Tempo",
+                "time_seconds": "Secondi",
+                "team_name": "Squadra",
+                "team_code": "Codice squadra",
+                "date": "Data",
+                "city": "Città",
+                "country_code": "Codice paese"
+            }
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# ============================================================
+# PAGE 5 - ATHLETES HALL OF FAME
+# ============================================================
+
+elif page == "Galleria dei campioni":
+
+    page_header(
+        "Galleria dei campioni",
+        "Ogni atleta ha una scheda costruita da due fonti: l’archivio dei record mondiali, che mostra "
+        "chi ha spostato il limite, e la top 200 di sempre, che racconta la continuità ad altissimo "
+        "livello. Scegli un atleta nel menu laterale e, più in basso, metti due campioni a confronto.",
+        image_file="athletes.jpg",
+        alt="Atleta durante una gara a farfalla",
+        ratio="70%"
+    )
+
+    # ------------------------------------------------------------------
+    # Identity keys and relay handling are built once in the loaders, so every
+    # page shares them. Relay rows pack four swimmers into a single cell, so
+    # they are excluded from every athlete-level view.
+    # ------------------------------------------------------------------
+    wr_a = wr[~wr["is_relay"] & (wr["athlete_key"] != "")].copy()
+    top_a = top[~top["is_relay"] & (top["athlete_key"] != "")].copy()
+
+    # Display name: prefer the world-record spelling, else prettify the top-200 one.
+    top_pairs = (
+        top_a.loc[top_a["athlete_key"] != "", ["athlete_key", "athlete"]]
+        .drop_duplicates("athlete_key")
+    )
+    wr_pairs = (
+        wr_a.loc[wr_a["athlete_key"] != "", ["athlete_key", "name"]]
+        .drop_duplicates("athlete_key")
+    )
+    display_names = {r.athlete_key: pretty_name(r.athlete) for r in top_pairs.itertuples()}
+    display_names.update({r.athlete_key: clean_text(r.name) for r in wr_pairs.itertuples()})
+
+    all_keys = sorted([k for k in display_names if k], key=lambda k: display_names[k])
+
+    def build_profile(key):
+        """Everything the identity card needs, gathered from both datasets."""
+        a_wr = wr_a[wr_a["athlete_key"] == key]
+        a_top = top_a[top_a["athlete_key"] == key]
+
+        nationality = "—"
+        if not a_wr.empty:
+            nats = a_wr["nationality"].apply(clean_text).replace("", np.nan).dropna()
+            if not nats.empty:
+                nationality = nats.mode().iloc[0]
+        if nationality == "—" and not a_top.empty:
+            teams = a_top["team_name"].apply(clean_text).replace("", np.nan).dropna()
+            if not teams.empty:
+                nationality = teams.mode().iloc[0]
+
+        birth_year = None
+        if not a_top.empty and "athlete_birth_date" in a_top.columns:
+            births = pd.to_datetime(a_top["athlete_birth_date"], errors="coerce").dropna()
+            if not births.empty:
+                birth_year = int(births.iloc[0].year)
+
+        years = []
+        if not a_wr.empty:
+            years += a_wr["date"].dropna().dt.year.tolist()
+        if not a_top.empty:
+            years += a_top["date"].dropna().dt.year.tolist()
+        career = f"{min(years)}–{max(years)}" if years else "—"
+
+        best_rank = "—"
+        if not a_top.empty and a_top["rank"].notna().any():
+            best_rank = int(a_top["rank"].min())
+
+        signature = "—"
+        if not a_top.empty:
+            signature = a_top["event_label"].value_counts().index[0]
+        elif not a_wr.empty:
+            signature = a_wr["event_label"].value_counts().index[0]
+
+        return {
+            "key": key,
+            "name": display_names.get(key, key.title()),
+            "nationality": nationality,
+            "birth_year": birth_year,
+            "career": career,
+            "wr_entries": len(a_wr),
+            "current_wr": int(a_wr["is_current_bool"].sum()) if not a_wr.empty else 0,
+            "top_entries": len(a_top),
+            "best_rank": best_rank,
+            "signature": signature,
+            "wr_rows": a_wr,
+            "top_rows": a_top,
+        }
+
+    def render_id_card(p, kicker="Scheda dell’atleta"):
+        birth = f"Nato/a nel {p['birth_year']}" if p["birth_year"] else "Anno di nascita non disponibile"
+        st.markdown(
+            f"<div class='athlete-card'>"
+            f"<div class='athlete-card-kicker'>{kicker}</div>"
+            f"<div class='athlete-card-name'>{p['name']}</div>"
+            f"<div class='athlete-card-meta'>"
+            f"{p['nationality']} &middot; {birth} &middot; Attività {p['career']}<br>"
+            f"Gara principale: <b>{p['signature']}</b>"
+            f"</div>"
+            f"<div class='athlete-stat-grid'>"
+            f"<div class='athlete-stat'><div class='athlete-stat-value'>{p['wr_entries']}</div>"
+            f"<div class='athlete-stat-label'>Record mondiali set</div></div>"
+            f"<div class='athlete-stat'><div class='athlete-stat-value'>{p['current_wr']}</div>"
+            f"<div class='athlete-stat-label'>Ancora imbattuti</div></div>"
+            f"<div class='athlete-stat'><div class='athlete-stat-value'>{p['top_entries']}</div>"
+            f"<div class='athlete-stat-label'>Prestazioni top 200</div></div>"
+            f"<div class='athlete-stat'><div class='athlete-stat-value'>{p['best_rank']}</div>"
+            f"<div class='athlete-stat-label'>Miglior posizione</div></div>"
+            f"</div></div>",
+            unsafe_allow_html=True,
+        )
+
+    # ------------------------------------------------------------------
+    # Athlete selection
+    # ------------------------------------------------------------------
+    with st.sidebar:
+        st.markdown("### Selezione dell’atleta")
+        search = st.text_input("Cerca atleta", "")
+        if search:
+            shown_keys = [k for k in all_keys if search.lower() in display_names[k].lower()]
+        else:
+            shown_keys = all_keys
+
+        selected_key = st.selectbox(
+            "Scegli l’atleta",
+            shown_keys,
+            index=0 if shown_keys else None,
+            format_func=lambda k: display_names.get(k, k),
+            key="athlete_pick"
+        )
+
+    st.info(
+        "Usa il pannello **Selezione dell’atleta** nel menu laterale per cercare e scegliere un "
+        "nuotatore: la scheda e i grafici si aggiornano in tempo reale."
+    )
+
+    if not selected_key:
+        st.warning("Nessun atleta corrisponde alla ricerca.")
+        st.stop()
+
+    profile = build_profile(selected_key)
+    athlete_wr = profile["wr_rows"].sort_values("date")
+    athlete_top = profile["top_rows"]
+
+    render_id_card(profile)
+
+    # ------------------------------------------------------------------
+    # 1. SMALL MULTIPLES.
+    #    A swimmer's records span events of wildly different length: Phelps set
+    #    marks at 49 seconds and at 251 seconds. Forcing both onto one y-axis
+    #    makes the short events a flat line at the bottom. Replicating one small
+    #    panel per event, each with its own scale, is the standard remedy.
+    # ------------------------------------------------------------------
+    st.markdown("### Come questo atleta ha migliorato i record")
+
+    if not athlete_wr.empty:
+        panel_events = athlete_wr["event_label"].value_counts().head(6).index.tolist()
+        panels = athlete_wr[athlete_wr["event_label"].isin(panel_events)].sort_values("date")
+
+        st.caption(
+            f"Un pannello per ogni gara, perché uno sprint da 50 metri e un 400 misti non possono "
+            f"condividere lo stesso asse verticale. In ogni pannello la linea scende quando "
+            f"{profile['name']} riduce il tempo del record mondiale. Ogni pannello utilizza una scala "
+            f"propria: osserva la forma della discesa, non l’altezza assoluta."
+        )
+
+        fig_sm = px.line(
+            panels,
+            x="date",
+            y="seconds",
+            facet_col="event_label",
+            facet_col_wrap=3,
+            markers=True,
+            color_discrete_sequence=[BLUE],
+            custom_data=["time", "meet", "location"],
+        )
+        fig_sm.update_yaxes(matches=None, showticklabels=True, title="")
+        fig_sm.update_xaxes(matches=None, title="")
+        fig_sm.update_traces(
+            line=dict(width=2.4),
+            marker=dict(size=7, line=dict(color="white", width=1)),
+            hovertemplate="%{customdata[0]} · %{x|%b %Y}<br>%{customdata[1]}<extra></extra>",
+        )
+        # Facet titles arrive as "event_label=Men 200m Butterfly (LC)".
+        fig_sm.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1], font=dict(size=12)))
+
+        rows_needed = int(np.ceil(len(panel_events) / 3))
+        fig_sm = plotly_clean_layout(fig_sm, height=200 + 190 * rows_needed, title=None)
+        fig_sm.update_layout(showlegend=False)
+        st.plotly_chart(
+            fig_sm,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+        st.caption(
+            "Secondi su ogni asse verticale e date più lontane a sinistra. Un salto netto indica "
+            "un grande miglioramento in una sola gara; una pendenza lieve mostra un record limato gradualmente."
+        )
+    else:
+        st.info("Questo atleta non risulta titolare di record mondiali nel dataset.")
+
+    # ------------------------------------------------------------------
+    # 2. Two questions that need a reference, not a raw number.
+    # ------------------------------------------------------------------
+    st.markdown("### Il confronto con i migliori di sempre")
+    st.caption(
+        "A sinistra, quanto il miglior tempo personale si avvicina alla prestazione più veloce mai "
+        "registrata in ogni gara: zero significa che l’atleta possiede il primato. A destra, le 200 "
+        "migliori prestazioni della gara principale, con i suoi risultati evidenziati."
+    )
+
+    col_a, col_b = st.columns([1, 1])
+
+    with col_a:
+        if not athlete_top.empty:
+            event_best = top.groupby("event_label")["time_seconds"].min()
+            personal_best = athlete_top.groupby("event_label")["time_seconds"].min()
+            reference = event_best.reindex(personal_best.index)
+
+            gap = pd.DataFrame({
+                "event_label": personal_best.index,
+                "pct_behind": (personal_best - reference) / reference * 100,
+                "personal_best": personal_best.values,
+            }).sort_values("pct_behind").head(12)
+
+            gap["is_best_ever"] = gap["pct_behind"] <= 0.001
+            gap["bar_color"] = np.where(gap["is_best_ever"], GOLD, BLUE)
+
+            fig_gap = go.Figure()
+            fig_gap.add_trace(go.Bar(
+                x=gap["pct_behind"],
+                y=gap["event_label"],
+                orientation="h",
+                marker_color=gap["bar_color"],
+                customdata=np.stack([gap["personal_best"]], axis=-1),
+                hovertemplate="%{y}<br>Miglior tempo personale %{customdata[0]:.2f} s"
+                              "<br>%{x:.2f}% dal miglior tempo di sempre<extra></extra>",
+                showlegend=False,
+            ))
+            fig_gap.add_vline(
+                x=0, line_color=GOLD, line_width=2,
+                annotation_text="Miglior tempo di sempre", annotation_position="top",
+                annotation_font=dict(color=DARK_GREY, size=11),
+            )
+            fig_gap.update_layout(yaxis=dict(autorange="reversed"))
+            fig_gap.update_xaxes(title="Percentuale di distacco dal miglior tempo di sempre")
+            fig_gap.update_yaxes(title="")
+            fig_gap = plotly_clean_layout(fig_gap, height=480, title="Distanza dal vertice")
+            st.plotly_chart(
+            fig_gap,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+            owned = int(gap["is_best_ever"].sum())
+            if owned:
+                st.caption(
+                    f"Una barra dorata di lunghezza zero significa che {profile['name']} possiede il "
+                    f"miglior tempo mai registrato in quella gara ({owned} in questa selezione)."
+                )
+            else:
+                st.caption(
+                    "Percentuale, non secondi: è l’unica unità che permette di confrontare uno "
+                    "sprint e una gara di fondo con lo stesso riferimento."
+                )
+        else:
+            st.info("Questo atleta non ha prestazioni nella top 200 di sempre.")
+
+    with col_b:
+        if not athlete_top.empty:
+            signature = athlete_top["event_label"].value_counts().index[0]
+            field = top[top["event_label"] == signature].dropna(subset=["time_seconds"])
+            mine = athlete_top[athlete_top["event_label"] == signature].dropna(subset=["time_seconds"])
+
+            fig_field = go.Figure()
+            fig_field.add_trace(go.Box(
+                x=field["time_seconds"],
+                name="",
+                boxpoints="all",
+                jitter=0.6,
+                pointpos=0,
+                marker=dict(color="rgba(82,97,107,0.30)", size=6),
+                line=dict(color=DARK_GREY),
+                fillcolor="rgba(34,184,207,0.10)",
+                hoverinfo="skip",
+                showlegend=False,
+            ))
+            fig_field.add_trace(go.Scatter(
+                x=mine["time_seconds"],
+                y=np.zeros(len(mine)),
+                mode="markers",
+                marker=dict(color=GOLD, size=11, line=dict(color="white", width=1.2)),
+                name=profile["name"],
+                customdata=np.stack([mine["time_label"], mine["rank"]], axis=-1),
+                hovertemplate="%{customdata[0]} · posizione %{customdata[1]}<extra></extra>",
+            ))
+            fig_field.update_xaxes(title="Tempo in secondi — più a sinistra è più veloce")
+            fig_field.update_yaxes(showticklabels=False, title="")
+            fig_field = plotly_clean_layout(fig_field, height=480, title=f"Nella top 200: {signature}")
+            st.plotly_chart(
+            fig_field,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+            st.caption(
+                f"{len(mine)} delle 200 prestazioni più veloci di sempre in questa gara appartengono a "
+                f"{profile['name']} (miglior posizione {int(mine['rank'].min())})."
+            )
+        else:
+            st.info("Non sono presenti risultati nella top 200, quindi non è possibile collocare l’atleta nella distribuzione.")
+    # ------------------------------------------------------------------
+    # Global context
+    # ------------------------------------------------------------------
+    section(
+        "Classifiche globali degli atleti",
+        "How the selected swimmer compares with the names that recur most often across the whole "
+        "archive. These charts count appearances, so they reward longevity as much as raw speed."
+    )
+
+    col_1, col_2 = st.columns(2)
+
+    with col_1:
+        wr_rank = (
+            wr_a[wr_a["athlete_key"] != ""]
+            .groupby("athlete_key")
+            .size()
+            .reset_index(name="world_record_entries")
+            .sort_values("world_record_entries", ascending=False)
+            .head(15)
+        )
+        wr_rank["athlete"] = wr_rank["athlete_key"].map(display_names)
+        wr_rank["highlight"] = np.where(
+            wr_rank["athlete_key"] == selected_key, "Atleta selezionato", "Altri atleti"
+        )
+
+        fig = px.bar(
+            wr_rank,
+            x="world_record_entries",
+            y="athlete",
+            orientation="h",
+            color="highlight",
+            color_discrete_map={"Atleta selezionato": GOLD, "Altri atleti": BLUE},
+        )
+        fig.update_layout(yaxis=dict(autorange="reversed"), legend_title_text="")
+        fig.update_xaxes(title="Record mondiali stabiliti")
+        fig.update_yaxes(title="")
+        fig = plotly_clean_layout(fig, height=520, title="Maggior numero di record mondiali")
+        st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+    )
+
+    with col_2:
+        top_rank = (
+            top_a[top_a["athlete_key"] != ""]
+            .groupby("athlete_key")
+            .size()
+            .reset_index(name="top_200_entries")
+            .sort_values("top_200_entries", ascending=False)
+            .head(15)
+        )
+        top_rank["athlete"] = top_rank["athlete_key"].map(display_names)
+        top_rank["highlight"] = np.where(
+            top_rank["athlete_key"] == selected_key, "Atleta selezionato", "Altri atleti"
+        )
+
+        fig = px.bar(
+            top_rank,
+            x="top_200_entries",
+            y="athlete",
+            orientation="h",
+            color="highlight",
+            color_discrete_map={"Atleta selezionato": GOLD, "Altri atleti": AQUA},
+        )
+        fig.update_layout(yaxis=dict(autorange="reversed"), legend_title_text="")
+        fig.update_xaxes(title="Prestazioni nella top 200 di sempre")
+        fig.update_yaxes(title="")
+        fig = plotly_clean_layout(fig, height=520, title="Maggior numero di prestazioni top 200")
+        st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+    )
+
+    st.caption(
+        "Quando l’atleta selezionato compare in un grafico, la sua barra è evidenziata in oro."
+    )
+
+    with st.expander("Record mondiali dell’atleta"):
+        if not athlete_wr.empty:
+            st.dataframe(
+                athlete_wr[
+                    ["event_label", "time", "seconds", "date", "nationality", "meet", "location", "is_current_bool"]
+                ],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.write("Nessun record mondiale disponibile.")
+
+    with st.expander("Prestazioni top 200 dell’atleta"):
+        if not athlete_top.empty:
+            st.dataframe(
+                athlete_top[
+                    ["event_label", "rank", "time_label", "time_seconds", "team_name", "date", "city"]
+                ],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.write("Nessuna prestazione top 200 disponibile.")
+
+    # ------------------------------------------------------------------
+    # HEAD TO HEAD
+    # ------------------------------------------------------------------
+    section(
+        "Testa a testa",
+        "Pick two swimmers and compare them directly. The chart below only uses events both of them "
+        "actually swam, so the two bars always measure the same thing in the same unit."
+    )
+
+    pick_l, pick_vs, pick_r = st.columns([1, 0.22, 1], gap="medium")
+
+    default_left = all_keys.index(selected_key) if selected_key in all_keys else 0
+    default_right = 1 if len(all_keys) > 1 else 0
+    if default_right == default_left and len(all_keys) > 1:
+        default_right = 0 if default_left != 0 else 1
+
+    with pick_l:
+        key_left = st.selectbox(
+            "Primo atleta",
+            all_keys,
+            index=default_left,
+            format_func=lambda k: display_names.get(k, k),
+            key="vs_left"
+        )
+
+    with pick_r:
+        key_right = st.selectbox(
+            "Secondo atleta",
+            all_keys,
+            index=default_right,
+            format_func=lambda k: display_names.get(k, k),
+            key="vs_right"
+        )
+
+    if key_left == key_right:
+        st.warning("Scegli due atleti diversi per visualizzare il confronto.")
+    else:
+        p_left = build_profile(key_left)
+        p_right = build_profile(key_right)
+
+        card_l, card_vs, card_r = st.columns([1, 0.22, 1], gap="medium")
+
+        with card_l:
+            render_id_card(p_left, kicker="Sfidante")
+
+        with card_vs:
+            st.markdown(
+                "<div class='vs-badge'><div class='vs-badge-inner'>VS</div></div>",
+                unsafe_allow_html=True,
+            )
+
+        with card_r:
+            render_id_card(p_right, kicker="Sfidante")
+
+        # --- Same reference, same unit: how far each sits from the all-time best ---
+        event_best = top.groupby("event_label")["time_seconds"].min()
+
+        def gap_per_event(p):
+            rows = p["top_rows"].dropna(subset=["time_seconds"])
+            if rows.empty:
+                return pd.Series(dtype=float)
+            personal = rows.groupby("event_label")["time_seconds"].min()
+            reference = event_best.reindex(personal.index)
+            return (personal - reference) / reference * 100
+
+        gap_l = gap_per_event(p_left)
+        gap_r = gap_per_event(p_right)
+        shared_events = sorted(set(gap_l.index) & set(gap_r.index))
+
+        if not shared_events:
+            st.info(
+                "I due atleti non condividono alcuna gara nella top 200 di sempre, quindi non è "
+                "possibile un confronto diretto. Le schede sopra riassumono comunque le rispettive carriere."
+            )
+        else:
+            duel = pd.DataFrame({
+                "event_label": shared_events,
+                "left": gap_l[shared_events].values,
+                "right": gap_r[shared_events].values,
+            })
+
+            fig = go.Figure()
+
+            for _, row in duel.iterrows():
+                fig.add_trace(go.Scatter(
+                    x=[row["left"], row["right"]],
+                    y=[row["event_label"], row["event_label"]],
+                    mode="lines",
+                    line=dict(color="rgba(82,97,107,0.35)", width=4),
+                    showlegend=False,
+                    hoverinfo="skip",
+                ))
+
+            fig.add_trace(go.Scatter(
+                x=duel["left"], y=duel["event_label"], mode="markers",
+                name=p_left["name"],
+                marker=dict(size=15, color=BLUE, line=dict(color="white", width=1.4)),
+                hovertemplate="%{y}<br>" + p_left["name"] + ": %{x:.2f}% behind<extra></extra>",
+            ))
+            fig.add_trace(go.Scatter(
+                x=duel["right"], y=duel["event_label"], mode="markers",
+                name=p_right["name"],
+                marker=dict(size=15, color=GOLD, line=dict(color="white", width=1.4)),
+                hovertemplate="%{y}<br>" + p_right["name"] + ": %{x:.2f}% behind<extra></extra>",
+            ))
+
+            fig.add_vline(
+                x=0, line_color=NAVY, line_width=2, line_dash="dot",
+                annotation_text="Miglior tempo di sempre", annotation_position="top",
+                annotation_font=dict(color=DARK_GREY, size=11),
+            )
+            fig.update_xaxes(title="Distacco percentuale dal miglior tempo di sempre — più a sinistra è meglio")
+            fig.update_yaxes(title="")
+            fig = plotly_clean_layout(
+                fig,
+                height=200 + 80 * len(duel),
+                title="Distanza di ciascun atleta dal miglior tempo di sempre"
+            )
+            st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+    )
+
+            wins_l = int((duel["left"] < duel["right"]).sum())
+            wins_r = int((duel["right"] < duel["left"]).sum())
+
+            st.markdown(
+                f"<div class='small-caption'>Nelle {len(duel)} gare condivise, "
+                f"<b>{p_left['name']}</b> è più vicino al miglior tempo di sempre in {wins_l} "
+                f"occasioni e <b>{p_right['name']}</b> in {wins_r}. Entrambi gli atleti sono misurati "
+                f"rispetto allo stesso riferimento fisso, cioè la prestazione più veloce mai registrata "
+                f"in ogni gara. La distanza orizzontale tra i punti rappresenta quindi la differenza "
+                f"reale, indipendentemente dalla lunghezza della gara.</div>",
+                unsafe_allow_html=True,
+            )
+# ============================================================
+# PAGE 6 - NATIONS & PLACES
+# ============================================================
+
+elif page == "Nazioni e luoghi":
+
+    # Filters (rendered in the sidebar) applied first so the map/charts react live.
+    filtered_wr = apply_common_filters(
+        wr,
+        gender=True,
+        course=True,
+        stroke=True,
+        distance=True,
+        key_prefix="nation"
+    )
+
+    if filtered_wr.empty:
+        st.warning("Nessun dato sui record mondiali disponibile con i filtri selezionati.")
+        st.stop()
+
+    # --- Nazionalità cleaning + ISO-3 mapping (needed for the world map) ---
+    
+    NAT_TO_ISO3 = {
+        "Argentina": "ARG", "Australia": "AUS", "Australasia": "AUS", "Austria": "AUT",
+        "Belarus": "BLR", "Belgium": "BEL", "Brazil": "BRA", "Canada": "CAN",
+        "Cayman Islands": "CYM", "China": "CHN", "Costa Rica": "CRI", "Croatia": "HRV",
+        "Denmark": "DNK", "East Germany": "DEU", "West Germany": "DEU", "Germany": "DEU",
+        "Finland": "FIN", "France": "FRA", "Great Britain": "GBR", "Hong Kong": "HKG",
+        "Hungary": "HUN", "Ireland": "IRL", "Italy": "ITA", "Jamaica": "JAM", "Japan": "JPN",
+        "Lithuania": "LTU", "Mexico": "MEX", "Netherlands": "NLD", "New Zealand": "NZL",
+        "Poland": "POL", "Romania": "ROU", "Russia": "RUS", "Soviet Union": "RUS",
+        "Unified Team at the Olympics": "RUS", "Serbia": "SRB", "Serbia and Montenegro": "SRB",
+        "Slovakia": "SVK", "South Africa": "ZAF", "Spain": "ESP", "Sweden": "SWE",
+        "Switzerland": "CHE", "Trinidad and Tobago": "TTO", "Turkey": "TUR", "USA": "USA",
+        "United States": "USA", "United States(Cali Condors)": "USA", "Ukraine": "UKR",
+        "Zimbabwe": "ZWE",
+    }
+    ISO3_TO_NAME = {
+        "USA": "Stati Uniti", "AUS": "Australia", "DEU": "Germania", "RUS": "Russia",
+        "GBR": "Gran Bretagna", "NLD": "Paesi Bassi", "JPN": "Japan", "CHN": "Cina",
+        "SWE": "Svezia", "HUN": "Ungheria", "CAN": "Canada", "FRA": "Francia",
+        "ITA": "Italia", "ESP": "Spagna", "BRA": "Brasile", "ZAF": "Sudafrica",
+        "NZL": "Nuova Zelanda", "POL": "Polonia", "ROU": "Romania", "UKR": "Ucraina",
+        "SRB": "Serbia", "AUT": "Austria", "BEL": "Belgio", "DNK": "Danimarca",
+        "FIN": "Finlandia", "CHE": "Svizzera", "IRL": "Irlanda", "HRV": "Croazia",
+        "SVK": "Slovacchia", "LTU": "Lituania", "BLR": "Bielorussia", "ARG": "Argentina",
+        "MEX": "Messico", "CRI": "Costa Rica", "JAM": "Giamaica", "TTO": "Trinidad e Tobago",
+        "TUR": "Turchia", "HKG": "Hong Kong", "CYM": "Isole Cayman", "ZWE": "Zimbabwe",
+    }
+
+    filtered_wr = filtered_wr.copy()
+    filtered_wr["iso3"] = filtered_wr["nationality"].map(NAT_TO_ISO3)
+
+    # On-page hint so users notice the sidebar filters.
+    st.info(
+        "Usa i **Filtri** nel menu laterale (genere, vasca, stile e distanza): "
+        "la mappa e i grafici si aggiornano in tempo reale."
+    )
+
+    # --- Build the world map data (Record registrati per nation) ---
+    map_data = (
+        filtered_wr.dropna(subset=["iso3"])
+        .groupby("iso3")
+        .size()
+        .reset_index(name="world_record_entries")
+    )
+    map_data["country"] = map_data["iso3"].map(ISO3_TO_NAME).fillna(map_data["iso3"])
+
+    fig_map = px.choropleth(
+        map_data,
+        locations="iso3",                 # mark = country area
+        color="world_record_entries",     # channel = colour (sequential)
+        hover_name="country",
+        color_continuous_scale=[[0.0, "#7FD4E0"], [0.5, BLUE], [1.0, NAVY]],
+        labels={"world_record_entries": "Record registrati"},
+    )
+    fig_map.update_traces(marker_line_color="white", marker_line_width=0.6)
+    fig_map.update_geos(
+        showframe=False,
+        showcoastlines=False,
+        showland=True, landcolor="#EDEFF2",     # no-data land = light grey
+        showocean=True, oceancolor="#CFE3EE",   # ocean = soft blue
+        showcountries=True, countrycolor="white",
+        projection_type="natural earth",
+    )
+    fig_map.update_geos(bgcolor="rgba(0,0,0,0)")
+    fig_map.update_layout(
+        height=430,
+        margin=dict(l=0, r=0, t=6, b=0),
+        font=dict(family="Barlow", size=13, color=NAVY),
+        paper_bgcolor="rgba(0,0,0,0)",
+        coloraxis_colorbar=dict(title="Record registrati"),
+    )
+
+    # --- Editorial header: title + description + MAP on the left, photo on the right ---
+    head_txt, head_img = st.columns([1.45, 1], gap="large")
+
+    with head_txt:
+        st.markdown("<div class='section-title'>Nazioni e luoghi</div>", unsafe_allow_html=True)
+        st.markdown("<div class='wave-rule'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='section-subtitle'>Quali paesi hanno prodotto il maggior numero di record "
+            "mondiali? La mappa mostra il <b>volume storico dei record per nazione</b>: un colore più "
+            "scuro indica più record. Gli stati storici, come Germania Est/Ovest e URSS, sono "
+            "ricondotti al paese moderno.</div>",
+            unsafe_allow_html=True,
+        )
+        st.plotly_chart(
+            fig_map,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+    with head_img:
+        st.markdown(
+            swim_figure("nations.jpg", alt="Atleta a dorso visto sott’acqua", ratio="126%"),
+            unsafe_allow_html=True,
+        )
+
+    # --- Two non-redundant breakdowns: who holds records now, and where they were set ---
+    st.markdown("### I numeri dietro la mappa")
+    st.caption(
+        "La mappa mostra *quali nazioni* dominano nel complesso. I due grafici aggiungono ciò che "
+        "una mappa comunica con minore precisione: la classifica esatta di chi detiene record "
+        "**oggi** e le **piscine e città** in cui sono stati stabiliti."
+    )
+
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        current_nations = (
+            filtered_wr[filtered_wr["is_current_bool"] == True]
+            .dropna(subset=["iso3"])
+            .assign(country=lambda d: d["iso3"].map(ISO3_TO_NAME).fillna(d["nationality"]))
+            .groupby("country")
+            .size()
+            .reset_index(name="current_records")
+            .sort_values("current_records", ascending=False)
+            .head(15)
+        )
+
+        fig = px.bar(
+            current_nations,
+            x="current_records",
+            y="country",
+            orientation="h",
+            color_discrete_sequence=[GOLD],
+        )
+        fig.update_layout(
+            yaxis=dict(autorange="reversed"),
+            showlegend=False,
+            xaxis_title="Record mondiale attuales held",
+            yaxis_title="",
+        )
+        fig = plotly_clean_layout(fig, height=520, title="Chi detiene i record mondiali oggi")
+        st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+    )
+
+    with col_b:
+        locations = (
+            filtered_wr[filtered_wr["location"].astype(str).str.strip() != ""]
+            .groupby("location")
+            .size()
+            .reset_index(name="records")
+            .sort_values("records", ascending=False)
+            .head(15)
+        )
+
+        fig = px.bar(
+            locations,
+            x="records",
+            y="location",
+            orientation="h",
+            color_discrete_sequence=[BLUE],
+        )
+        fig.update_layout(
+            yaxis=dict(autorange="reversed"),
+            showlegend=False,
+            xaxis_title="Record mondiali set at this location",
+            yaxis_title="",
+        )
+        fig = plotly_clean_layout(fig, height=520, title="Dove vengono stabiliti i record")
+        st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+    )
+
+    st.markdown(
+        """
+        <div class="small-caption">
+        Nota interpretativa: queste viste mostrano la rappresentazione all’interno dei dataset disponibili.
+        Non devono essere lette come un medagliere completo o come una classifica assoluta dei sistemi natatori nazionali.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+# ============================================================
+# PAGE 7 - COMPARE EVENTS
+# ============================================================
+
+elif page == "Confronto tra gare":
+
+    section(
+        "Confronto tra gare",
+        "Uno sprint da 50 metri e una gara da 1500 metri non possono essere confrontati con il tempo "
+        "assoluto: una dura circa venti secondi, l’altra oltre un quarto d’ora. Per studiarne l’evoluzione "
+        "bisogna normalizzare i tempi e porre le stesse domande: quante volte è stato battuto il record, "
+        "quanto è migliorato e da quanto resiste il primato attuale? Scegli le gare da mettere a confronto."
+    )
+
+    filtered = apply_common_filters(
+        wr,
+        gender=True,
+        course=True,
+        stroke=True,
+        distance=True,
+        key_prefix="compare"
+    )
+
+    # Relay records belong to a team of four, not to a single event progression,
+    # so they are left out of an event-to-event comparison.
+    filtered = filtered[~filtered["is_relay"]]
+    filtered = filtered.dropna(subset=["seconds", "date"])
+
+    if filtered.empty:
+        st.warning("Nessun dato disponibile con i filtri selezionati.")
+        st.stop()
+
+    st.info(
+        "Usa i **Filtri** nel menu laterale per restringere l’elenco delle gare, poi scegli quelle "
+        "da confrontare nel selettore qui sotto."
+    )
+
+    # ------------------------------------------------------------------
+    # One row per event: the four questions above, answered numerically.
+    # ------------------------------------------------------------------
+    summary_rows = []
+
+    for event, group in filtered.groupby("event_label"):
+        group = group.sort_values("date")
+
+        if len(group) < 3:
+            continue
+
+        first = group.iloc[0]
+        last = group.iloc[-1]
+
+        current_rows = group[group["is_current_bool"] == True]
+        if not current_rows.empty:
+            current = current_rows.iloc[-1]
+        else:
+            current = last
+
+        current_date = current["date"]
+        age_years = (pd.Timestamp.today() - current_date).days / 365.25 if pd.notna(current_date) else np.nan
+        history_years = (last["date"] - first["date"]).days / 365.25
+
+        summary_rows.append(
+            {
+                "event_label": event,
+                "records": len(group),
+                "first_year": first["year"],
+                "latest_year": last["year"],
+                "improvement_s": first["seconds"] - last["seconds"],
+                "improvement_pct": (first["seconds"] - last["seconds"]) / first["seconds"] * 100
+                if first["seconds"] else np.nan,
+                "current_record_age_years": age_years,
+                "history_years": history_years,
+                "current_holder": clean_text(current["name"]),
+                "current_time": clean_text(current["time"]),
+            }
+        )
+
+    summary = pd.DataFrame(summary_rows)
+
+    if summary.empty:
+        st.warning("Nessun riepilogo comparabile disponibile.")
+        st.stop()
+
+    oldest = summary.sort_values("current_record_age_years", ascending=False).iloc[0]
+    biggest = summary.sort_values("improvement_pct", ascending=False).iloc[0]
+
+    c1, c2, c3 = st.columns(3)
+
+    with c1:
+        st.metric("Gare confrontate", len(summary))
+
+    with c2:
+        st.metric("Record attuale più longevo", f"{oldest['current_record_age_years']:.1f} anni")
+
+    with c3:
+        st.metric("Miglioramento maggiore", f"{biggest['improvement_pct']:.1f}%")
+
+    st.caption(
+        f"Il record più longevo appartiene a **{oldest['event_label']}** "
+        f"({clean_text(oldest['current_holder'])}). La gara migliorata maggiormente dal primo record "
+        f"registrato è **{biggest['event_label']}**."
+    )
+
+    # ------------------------------------------------------------------
+    # Selection interface (two or more events), as prescribed for a
+    # comparison task: pick the subjects first, then compare them.
+    # ------------------------------------------------------------------
+    all_events = sorted(summary["event_label"].tolist())
+
+    preferred = [
+        e for e in [
+            "Uomini 100 m Stile libero (LC)",
+            "Donne 100 m Stile libero (LC)",
+            "Uomini 1500 m Stile libero (LC)",
+            "Uomini 50 m Stile libero (LC)",
+        ] if e in all_events
+    ]
+    default_events = preferred[:4] if len(preferred) >= 2 else all_events[: min(3, len(all_events))]
+
+    chosen = st.multiselect(
+        "Gare da confrontare (da due a sei è l’ideale)",
+        all_events,
+        default=default_events,
+        key="compare_events_pick"
+    )
+
+    if len(chosen) < 2:
+        st.warning("Scegli almeno due gare da confrontare.")
+        st.stop()
+
+    if len(chosen) > 6:
+        st.info("Vengono mostrate le prime sei gare: oltre questo numero le linee diventano difficili da seguire.")
+        chosen = chosen[:6]
+
+    series_colors = [BLUE, GOLD, AQUA, NAVY, RED, DARK_GREY]
+    color_of = {event: series_colors[i % len(series_colors)] for i, event in enumerate(chosen)}
+
+    # ------------------------------------------------------------------
+    # 1. Progression on a shared scale.
+    #    Each event is indexed to its own first world record = 100, which is the
+    #    only way a 20-second sprint and a 15-minute race can share a y-axis.
+    # ------------------------------------------------------------------
+    st.markdown("### Quanto è migliorato ogni record")
+    st.caption(
+        "Ogni gara parte da 100, cioè dal proprio primo record mondiale. Una linea che scende a 70 "
+        "indica che il record è migliorato del 30% dall’inizio dell’archivio. Le linee grigie "
+        "rappresentano le altre gare e forniscono il contesto generale."
+    )
+
+    fig_index = go.Figure()
+
+    for event, group in filtered.groupby("event_label"):
+        if event in chosen or len(group) < 3:
+            continue
+        group = group.sort_values("date")
+        base = group["seconds"].iloc[0]
+        if not base:
+            continue
+        fig_index.add_trace(go.Scatter(
+            x=group["date"],
+            y=group["seconds"] / base * 100,
+            mode="lines",
+            line=dict(color="rgba(82,97,107,0.12)", width=1),
+            showlegend=False,
+            hoverinfo="skip",
+        ))
+
+    for event in chosen:
+        group = filtered[filtered["event_label"] == event].sort_values("date")
+        base = group["seconds"].iloc[0]
+        fig_index.add_trace(go.Scatter(
+            x=group["date"],
+            y=group["seconds"] / base * 100,
+            mode="lines+markers",
+            name=event,
+            line=dict(color=color_of[event], width=2.6),
+            marker=dict(size=5, color=color_of[event]),
+            customdata=np.stack([group["name"], group["time"]], axis=-1),
+            hovertemplate=f"<b>{event}</b><br>%{{customdata[0]}} · %{{customdata[1]}}"
+                          "<br>%{y:.1f}% rispetto al primo record<extra></extra>",
+        ))
+
+    fig_index.add_hline(
+        y=100, line_dash="dot", line_color=DARK_GREY, opacity=0.7,
+        annotation_text="Primo record mondiale registrato", annotation_position="bottom left",
+        annotation_font=dict(color=DARK_GREY, size=11),
+    )
+    fig_index.update_xaxes(title="Anno di realizzazione del record")
+    fig_index.update_yaxes(title="Tempo del record in % rispetto al primo primato della gara")
+    fig_index = plotly_clean_layout(fig_index, height=560, title="Evoluzione dei record mondiali su scala comune")
+    fig_index.update_layout(
+        margin=dict(l=30, r=30, t=130, b=40),
+        legend=dict(orientation="h", y=1.02, yanchor="bottom", x=0, xanchor="left"),
+    )
+    st.plotly_chart(
+            fig_index,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+    # ------------------------------------------------------------------
+    # 2. The same events on four axes at once.
+    #    A radar is the standard answer to "compare a few subjects across
+    #    several metrics"; every axis is rescaled 0-100 against the strongest
+    #    event in the archive, because the four metrics have different units.
+    # ------------------------------------------------------------------
+    st.markdown("### Le stesse gare, quattro aspetti insieme")
+    st.caption(
+        "Ogni asse rappresenta un indicatore, riscalato in modo che 100 corrisponda al valore massimo "
+        "dell’intero archivio. Una forma ampia indica una gara con molti record, grandi miglioramenti "
+        "e una lunga storia. Poiché gli indicatori hanno unità diverse, confronta le forme e non le distanze grezze."
+    )
+
+    radar_metrics = [
+        ("records", "Numero di record"),
+        ("improvement_pct", "Miglioramento totale"),
+        ("current_record_age_years", "Età del record attuale"),
+        ("history_years", "Anni di storia"),
+    ]
+    maxima = {col: summary[col].max() for col, _ in radar_metrics}
+
+    fig_radar = go.Figure()
+
+    for event in chosen:
+        row = summary[summary["event_label"] == event].iloc[0]
+        values = [
+            (row[col] / maxima[col] * 100) if maxima[col] else 0
+            for col, _ in radar_metrics
+        ]
+        labels = [label for _, label in radar_metrics]
+        fig_radar.add_trace(go.Scatterpolar(
+            r=values + [values[0]],
+            theta=labels + [labels[0]],
+            fill="toself",
+            name=event,
+            line=dict(color=color_of[event], width=2),
+            opacity=0.55,
+        ))
+
+    fig_radar.update_layout(
+        polar=dict(
+            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(visible=True, range=[0, 100], gridcolor="rgba(5,43,68,0.12)"),
+            angularaxis=dict(gridcolor="rgba(5,43,68,0.12)"),
+        )
+    )
+    fig_radar = plotly_clean_layout(fig_radar, height=560, title="Profili delle gare a confronto")
+    fig_radar.update_layout(
+        margin=dict(l=60, r=60, t=90, b=110),
+        legend=dict(orientation="h", y=-0.12, yanchor="top", x=0.5, xanchor="center"),
+    )
+    st.plotly_chart(
+            fig_radar,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+    # ------------------------------------------------------------------
+    # 3. Where the chosen events sit inside the whole archive.
+    # ------------------------------------------------------------------
+    st.markdown("### I record battuti spesso sono anche più recenti?")
+    st.caption(
+        "Ogni punto rappresenta una gara. Le gare più a destra hanno avuto molti record; quelle più "
+        "in alto conservano ancora un primato stabilito molti anni fa. Le gare selezionate sono evidenziate a colori."
+    )
+
+    summary["is_chosen"] = summary["event_label"].isin(chosen)
+
+    fig_scatter = go.Figure()
+
+    others = summary[~summary["is_chosen"]]
+    fig_scatter.add_trace(go.Scatter(
+        x=others["records"],
+        y=others["current_record_age_years"],
+        mode="markers",
+        marker=dict(size=9, color="rgba(82,97,107,0.28)", line=dict(color="white", width=0.6)),
+        name="Altre gare",
+        customdata=np.stack([others["event_label"], others["improvement_pct"]], axis=-1),
+        hovertemplate="<b>%{customdata[0]}</b><br>%{x} record<br>"
+                      "record attuale vecchio di %{y:.1f} anni<br>miglioramento %{customdata[1]:.1f}%<extra></extra>",
+    ))
+
+    for event in chosen:
+        row = summary[summary["event_label"] == event].iloc[0]
+        fig_scatter.add_trace(go.Scatter(
+            x=[row["records"]],
+            y=[row["current_record_age_years"]],
+            mode="markers+text",
+            marker=dict(size=16, color=color_of[event], line=dict(color="white", width=1.4)),
+            text=[event],
+            textposition="top center",
+            textfont=dict(size=11, color=NAVY),
+            name=event,
+            showlegend=False,
+            hovertemplate=f"<b>{event}</b><br>%{{x}} record<br>"
+                          f"record attuale vecchio di %{{y:.1f}} anni<extra></extra>",
+        ))
+
+    fig_scatter.update_xaxes(title="Numero di volte in cui il record è stato battuto")
+    fig_scatter.update_yaxes(title="Età del record attuale, in anni")
+    fig_scatter = plotly_clean_layout(fig_scatter, height=560, title="Frequenza dei record ed età del primato attuale")
+    fig_scatter.update_layout(
+        margin=dict(l=30, r=30, t=110, b=40),
+        legend=dict(orientation="h", y=1.02, yanchor="bottom", x=0, xanchor="left"),
+    )
+    st.plotly_chart(
+            fig_scatter,
+            use_container_width=True,
+            config={"displaylogo": False, "responsive": True, "locale": "it", "modeBarButtonsToRemove": ["lasso2d", "select2d"]},
+        )
+
+    st.markdown(
+        "<div class='small-caption'>Nota di lettura: una gara può aver avuto molti record e conservare "
+        "comunque un primato datato, se i progressi si sono arrestati. I conteggi dipendono dalla "
+        "completezza dell’archivio, quindi poche registrazioni non indicano necessariamente stabilità.</div>",
+        unsafe_allow_html=True
+    )
+
+    st.dataframe(
+        summary.drop(columns=["is_chosen"]).sort_values("records", ascending=False).rename(
+            columns={
+                "event_label": "Gara",
+                "records": "Numero di record",
+                "first_year": "Primo anno",
+                "latest_year": "Ultimo anno",
+                "improvement_s": "Miglioramento, secondi",
+                "improvement_pct": "Miglioramento, %",
+                "current_record_age_years": "Età del record attuale, anni",
+                "history_years": "Anni di storia",
+                "current_holder": "Detentore attuale",
+                "current_time": "Tempo attuale"
+            }
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# ============================================================
+# PAGE 8 - DATA & METHODS
+# ============================================================
+
+elif page == "Dati e metodi":
+
+    section(
+        "Dati e metodi",
+        "Questa pagina spiega come l’app utilizza i due dataset e quali limiti devono essere considerati."
+    )
+
+    st.markdown(
+        """
+        <div class="info-box">
+        <b>Dataset 1 — Storia dei record mondiali</b><br>
+        Utilizzato per visualizzare l’evoluzione storica dei record mondiali per genere, vasca, distanza e stile.
+        Contiene nome dell’atleta, nazionalità, data, competizione, luogo, tempo in secondi e indicazione del record attuale.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.dataframe(
+        pd.DataFrame(
+            {
+                "Proprietà": [
+                    "Righe",
+                    "Gare",
+                    "Atleti",
+                    "Nazionalità",
+                    "Vasche",
+                    "Anni"
+                ],
+                "Value": [
+                    len(wr),
+                    wr["event_label"].nunique(),
+                    wr["name"].nunique(),
+                    wr["nationality"].nunique(),
+                    ", ".join(safe_unique(wr["course"])),
+                    f"{int(wr['year'].min())}–{int(wr['year'].max())}" if wr["year"].notna().any() else "-"
+                ]
+            }
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.markdown(
+        """
+        <div class="info-box">
+        <b>Dataset 2 — Top 200 delle prestazioni di sempre</b><br>
+        Utilizzato per esplorare la profondità dell’élite oltre il singolo record.
+        Contiene posizione, atleta, squadra, descrizione della gara, tempo, data e luogo della competizione.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.dataframe(
+        pd.DataFrame(
+            {
+                "Proprietà": [
+                    "Righe",
+                    "Gare",
+                    "Atleti",
+                    "Squadre",
+                    "Città",
+                    "Anni"
+                ],
+                "Value": [
+                    len(top),
+                    top["event_label"].nunique(),
+                    top["athlete"].nunique(),
+                    top["team_name"].nunique(),
+                    top["city"].nunique(),
+                    f"{int(top['year'].min())}–{int(top['year'].max())}" if top["year"].notna().any() else "-"
+                ]
+            }
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    section("Regole di interpretazione")
+
+    st.markdown(
+        """
+        <div class="warning-box">
+        <b>1. Solo dati di élite.</b><br>
+        L’app non rappresenta tutte le gare di nuoto disputate nella storia. Si concentra sui record mondiali e sulle 200 migliori prestazioni di sempre.
+        <br><br>
+        <b>2. Lo stesso atleta può comparire più volte.</b><br>
+        Le righe rappresentano prestazioni o record, non atleti unici.
+        <br><br>
+        <b>3. Vasca lunga and short course are not directly equivalent.</b><br>
+        L’app consente il confronto, ma l’interpretazione deve considerare che LC e SC sono contesti di gara differenti.
+        <br><br>
+        <b>4. Un tempo più basso è migliore.</b><br>
+        I grafici temporali invertono l’asse verticale per rendere intuitivo il miglioramento della prestazione.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    with st.expander("Anteprima dei record mondiali grezzi"):
+        st.dataframe(wr.head(100), use_container_width=True)
+
+<<<<<<< HEAD
+    with st.expander("Anteprima delle prestazioni top grezze"):
+        st.dataframe(top.head(100), use_container_width=True)
+
+
+# ============================================================
+# PAGE 8 - GAME (SWIM RECORD TOE)
+# ============================================================
+
+elif page == "Gioco":
+
+    page_header(
+        "Tris dei record del nuoto",
+        "Il tris giocato con l’archivio dei record. Ogni casella incrocia una regola di riga e una "
+        "di colonna: per conquistarla devi nominare un atleta che abbia davvero stabilito un record "
+        "mondiale rispettando entrambe. Tre caselle in fila vincono la partita.",
+        image_file="game.jpg",
+        alt="Occhialini da nuoto a bordo piscina",
+        ratio="70%"
+    )
+
+    game_df = prepare_swim_game_data(wr)
+
+    if game_df.empty:
+        st.error("Il gioco non può iniziare perché il dataset dei record mondiali non contiene nomi utilizzabili.")
+        st.stop()
+
+    st.markdown(
+        "<div class='info-box'>"
+        "<b>Le regole</b>"
+        "<ol>"
+        "<li>Due giocatori condividono lo stesso schermo. Inizia <b>❌</b>, poi tocca a <b>⭕</b>.</li>"
+        "<li>Seleziona una casella libera. La regola della riga e quella della colonna sono indicate sopra e a lato.</li>"
+        "<li>Indica un atleta che abbia stabilito un record mondiale rispettando <b>entrambe</b> le "
+        "regole. Scrivi il nome oppure sceglilo dall’elenco. Piccoli errori di ortografia sono tollerati.</li>"
+        "<li><b>Risposta corretta:</b> conquisti la casella. <b>Risposta errata:</b> perdi il turno, "
+        "quindi scegli con attenzione.</li>"
+        "<li>Ogni atleta può essere utilizzato <b>una sola volta</b> nella partita, da entrambi i giocatori.</li>"
+        "<li>Tre caselle in fila, in orizzontale, verticale o diagonale, fanno vincere. "
+        "Se la griglia si riempie senza tris, la partita termina in pareggio.</li>"
+        "</ol>"
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+    # Gender and course only hold two values each, so they can never fill three
+    # rows or three columns. Offering them guaranteed a broken board.
+    row_options = {
+        "Gara specifica": "event_label",
+        "Tipo di gara": "event_family",
+        "Stile": "stroke",
+    }
+
+    col_options = {
+        "Nazionalità": "nationality",
+        "Decennio": "decade",
+        "Luogo o piscina del record": "record_place",
+    }
+
+    c_setup_1, c_setup_2, c_setup_3 = st.columns([1, 1, 0.7])
+
+    with c_setup_1:
+        row_label = st.selectbox("Righe are", list(row_options.keys()), index=1, key="swim_toe_row_label")
+
+    with c_setup_2:
+        col_label = st.selectbox("Le colonne rappresentano", list(col_options.keys()), index=0, key="swim_toe_col_label")
+
+    row_col = row_options[row_label]
+    col_col = col_options[col_label]
+
+    with c_setup_3:
+        st.write("")
+        st.write("")
+        new_game = st.button("Nuova partita", use_container_width=True, key="swim_toe_new")
+
+    state_missing = (
+        "swim_toe_board" not in st.session_state
+        or "swim_toe_rows" not in st.session_state
+        or "swim_toe_win_line" not in st.session_state
+    )
+    axes_changed = (
+        st.session_state.get("swim_toe_row_col") != row_col
+        or st.session_state.get("swim_toe_col_col") != col_col
+    )
+
+    if state_missing or axes_changed or new_game:
+        st.session_state.swim_toe_row_col = row_col
+        st.session_state.swim_toe_col_col = col_col
+        reset_swim_record_toe(game_df, row_col, col_col)
+
+    rows = st.session_state.swim_toe_rows
+    cols = st.session_state.swim_toe_cols
+    board = st.session_state.swim_toe_board
+
+    if not rows or not cols:
+        st.warning("Queste due regole non consentono di creare una griglia completa. Prova un’altra combinazione.")
+        st.stop()
+
+    # Answers per cell are needed all over the page: compute them once per run.
+    cell_answers = {
+        (i, j): get_cell_answers(game_df, rows[i], cols[j], row_col, col_col)
+        for i in range(3) for j in range(3)
+    }
+
+    used_names = st.session_state.swim_toe_used_names
+    winner = st.session_state.swim_toe_winner
+
+    # A game can run out of legal moves before the board is full.
+    if winner is None and not swim_game_has_moves(game_df, rows, cols, row_col, col_col, board, used_names):
+        st.session_state.swim_toe_winner = "Pareggio"
+        st.session_state.swim_toe_win_line = None
+        winner = "Pareggio"
+
+    # ---------------- Scoreboard ----------------
+    claimed = sum(1 for i in range(3) for j in range(3) if board[i][j] != "")
+    turn = st.session_state.swim_toe_turn
+    misses = st.session_state.swim_toe_misses
+
+    if winner is None:
+        status_text = "Partita in corso"
+    elif winner == "Pareggio":
+        status_text = "Pareggio"
+    else:
+        status_text = f"{winner} vince"
+
+    c_turn_1, c_turn_2, c_turn_3 = st.columns(3)
+
+    with c_turn_1:
+        st.markdown(
+            f"""
+            <div class="game-turn-card">
+            <div class="gt-label">Turno attuale</div>
+            <div class="gt-value" style="font-size:34px;">{turn if winner is None else "—"}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c_turn_2:
+        st.markdown(
+            f"""
+            <div class="game-turn-card">
+            <div class="gt-label">Caselle conquistate</div>
+            <div class="gt-value" style="font-size:34px;">{claimed}/9</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with c_turn_3:
+        st.markdown(
+            f"""
+            <div class="game-turn-card">
+            <div class="gt-label">Stato</div>
+            <div class="gt-value" style="font-size:22px;">{status_text}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.caption(f"Turni persi — ❌ {misses['❌']} · ⭕ {misses['⭕']}")
+
+    if st.session_state.swim_toe_threshold < 3:
+        st.caption(
+            "Attenzione: con queste regole alcune caselle hanno pochi atleti validi. "
+            "Premi **Nuova partita** o cambia regole per ottenere una griglia più semplice."
+        )
+
+    # ---------------- The board ----------------
+    if winner is None:
+        header_cols = st.columns([0.85, 1, 1, 1], gap="medium")
+        header_cols[0].markdown("<div class='game-empty-corner'></div>", unsafe_allow_html=True)
+        for j in range(3):
+            col_display = display_game_value(col_col, cols[j])
+            header_cols[j + 1].markdown(f"<div class='game-axis-label'>{col_display}</div>", unsafe_allow_html=True)
+
+        for i in range(3):
+            grid_cols = st.columns([0.85, 1, 1, 1], gap="medium")
+            row_display = display_game_value(row_col, rows[i])
+            grid_cols[0].markdown(f"<div class='game-row-label'>{row_display}</div>", unsafe_allow_html=True)
+
+            for j in range(3):
+                mark = board[i][j]
+
+                if mark != "":
+                    label = f"{mark}\n{st.session_state.swim_toe_answers[i][j]}"
+                    disabled = True
+                elif st.session_state.swim_toe_selected == (i, j):
+                    label = "Selezionata"
+                    disabled = False
+                else:
+                    label = "Scegli"
+                    disabled = False
+
+                if grid_cols[j + 1].button(
+                    label,
+                    key=f"swim_toe_cell_{i}_{j}",
+                    use_container_width=True,
+                    disabled=disabled
+                ):
+                    st.session_state.swim_toe_selected = (i, j)
+                    st.session_state.swim_toe_feedback = ""
+                    st.session_state.swim_toe_hint = ""
+                    st.rerun()
+    else:
+        # Game over: redraw the board as a single hand-drawn picture, with the
+        # winning line struck through, the way you would on paper.
+        line = st.session_state.swim_toe_win_line
+        cell = 150
+        pad = 26
+        size = cell * 3 + pad * 2
+
+        def centre(i, j):
+            return pad + cell * j + cell / 2, pad + cell * i + cell / 2
+
+        marks_svg = ""
+        for i in range(3):
+            for j in range(3):
+                mark = board[i][j]
+                if not mark:
+                    continue
+                cx, cy = centre(i, j)
+                if mark == "❌":
+                    r = 38
+                    marks_svg += (
+                        f"<line x1='{cx-r}' y1='{cy-r}' x2='{cx+r}' y2='{cy+r}' "
+                        f"stroke='{NAVY}' stroke-width='11' stroke-linecap='round'/>"
+                        f"<line x1='{cx+r}' y1='{cy-r}' x2='{cx-r}' y2='{cy+r}' "
+                        f"stroke='{NAVY}' stroke-width='11' stroke-linecap='round'/>"
+                    )
+                else:
+                    marks_svg += (
+                        f"<circle cx='{cx}' cy='{cy}' r='40' fill='none' "
+                        f"stroke='{BLUE}' stroke-width='11'/>"
+                    )
+
+        grid_svg = ""
+        for k in (1, 2):
+            x = pad + cell * k
+            y = pad + cell * k
+            grid_svg += (
+                f"<line x1='{x}' y1='{pad-8}' x2='{x}' y2='{size-pad+8}' "
+                f"stroke='{NAVY}' stroke-width='9' stroke-linecap='round'/>"
+                f"<line x1='{pad-8}' y1='{y}' x2='{size-pad+8}' y2='{y}' "
+                f"stroke='{NAVY}' stroke-width='9' stroke-linecap='round'/>"
+            )
+
+        strike_svg = ""
+        if line:
+            (i1, j1), (i3, j3) = line[0], line[2]
+            x1, y1 = centre(i1, j1)
+            x2, y2 = centre(i3, j3)
+            dx, dy = x2 - x1, y2 - y1
+            norm = (dx ** 2 + dy ** 2) ** 0.5 or 1
+            ext = 42
+            x1 -= dx / norm * ext
+            y1 -= dy / norm * ext
+            x2 += dx / norm * ext
+            y2 += dy / norm * ext
+            strike_svg = (
+                f"<line x1='{x1:.0f}' y1='{y1:.0f}' x2='{x2:.0f}' y2='{y2:.0f}' "
+                f"stroke='{GOLD}' stroke-width='13' stroke-linecap='round' opacity='0.95'/>"
+            )
+
+        st.markdown(
+            f"<div style='display:flex;justify-content:center;margin:6px 0 10px 0;'>"
+            f"<svg viewBox='0 0 {size} {size}' width='430' height='430' "
+            f"xmlns='http://www.w3.org/2000/svg'>{grid_svg}{marks_svg}{strike_svg}</svg>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        if winner == "Pareggio":
+            st.success("La partita termina in pareggio: non ci sono più caselle libere.")
+        else:
+            st.success(f"{winner} vince la sfida in piscina!")
+            st.balloons()
+
+        with st.expander("Vedi chi ha conquistato ogni casella"):
+            for i in range(3):
+                for j in range(3):
+                    if board[i][j]:
+                        row_shown = display_game_value(row_col, rows[i])
+                        col_shown = display_game_value(col_col, cols[j])
+                        st.write(f"**{board[i][j]}** · {row_shown} × {col_shown} → {st.session_state.swim_toe_answers[i][j]}")
+
+        if st.button("Gioca ancora", key="swim_toe_again", use_container_width=False):
+            reset_swim_record_toe(game_df, row_col, col_col)
+            st.rerun()
+
+    # ---------------- Feedback from the previous move ----------------
+    # Streamlit reruns after every click, so a message printed before the rerun
+    # would flash and vanish. It is stored in state and shown on the next run.
+    if st.session_state.swim_toe_feedback:
+        kind = st.session_state.swim_toe_feedback_kind
+        if kind == "success":
+            st.success(st.session_state.swim_toe_feedback)
+        elif kind == "error":
+            st.error(st.session_state.swim_toe_feedback)
+        else:
+            st.warning(st.session_state.swim_toe_feedback)
+        st.session_state.swim_toe_feedback = ""
+
+    # ---------------- Answering ----------------
+    selected = st.session_state.swim_toe_selected
+
+    if selected is not None and winner is None:
+        i, j = selected
+        row_value, col_value = rows[i], cols[j]
+        row_display = display_game_value(row_col, row_value)
+        col_display = display_game_value(col_col, col_value)
+        valid_answers = cell_answers[(i, j)]
+        remaining = [a for a in valid_answers if normalize_answer(a) not in used_names]
+
+        st.markdown(
+            f"<div class='info-box'>"
+            f"<b>{turn}, indica un atleta</b><br>"
+            f"Chi ha stabilito un record mondiale in <b>{row_display}</b> e <b>{col_display}</b>?"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+
+        c_ans_1, c_ans_2 = st.columns(2)
+
+        with c_ans_1:
+            typed_answer = st.text_input(
+                "Scrivi il nome",
+                placeholder="Esempio: Michael Phelps",
+                key=f"typed_answer_{i}_{j}"
+            )
+
+        with c_ans_2:
+            all_swimmers = sorted(
+                {clean_text(n) for n in game_df["name"].dropna().astype(str)} - set()
+            )
+            dropdown_answer = st.selectbox(
+                "…oppure scegli un atleta dall’archivio dei record",
+                [""] + all_swimmers,
+                index=0,
+                key=f"dropdown_answer_{i}_{j}"
+            )
+
+        answer_to_check = typed_answer.strip() or dropdown_answer.strip()
+
+        c1, c2, c3 = st.columns([1, 1, 1])
+
+        with c1:
+            submit_answer = st.button("Conferma", use_container_width=True, key=f"submit_{i}_{j}")
+        with c2:
+            clear_selection = st.button("Scegli un’altra casella", use_container_width=True, key=f"cancel_{i}_{j}")
+        with c3:
+            reveal_hint = st.button("Suggerimento", use_container_width=True, key=f"hint_{i}_{j}")
+
+        if clear_selection:
+            st.session_state.swim_toe_selected = None
+            st.session_state.swim_toe_hint = ""
+            st.rerun()
+
+        if reveal_hint and remaining:
+            initials = sorted({a[0].upper() for a in remaining})
+            st.session_state.swim_toe_hint = (
+                f"{len(remaining)} swimmer(s) still fit this square. "
+                f"Their surnames or first names begin with: {', '.join(initials)}."
+            )
+
+        if st.session_state.swim_toe_hint:
+            st.info(st.session_state.swim_toe_hint)
+
+        if submit_answer:
+            if answer_to_check == "":
+                st.session_state.swim_toe_feedback = "Scrivi o seleziona un atleta prima di confermare."
+                st.session_state.swim_toe_feedback_kind = "warning"
+                st.rerun()
+
+            elif normalize_answer(answer_to_check) in used_names:
+                st.session_state.swim_toe_feedback = (
+                    f"{answer_to_check} has already been used in this game. That does not cost you "
+                    f"your turn — pick another swimmer."
+                )
+                st.session_state.swim_toe_feedback_kind = "warning"
+                st.rerun()
+
+            else:
+                is_correct, matched_name, _ = validate_swim_answer(
+                    game_df, answer_to_check, row_value, col_value, row_col, col_col
+                )
+
+                if is_correct:
+                    st.session_state.swim_toe_board[i][j] = turn
+                    st.session_state.swim_toe_answers[i][j] = matched_name
+                    st.session_state.swim_toe_used_names.append(normalize_answer(matched_name))
+
+                    new_winner, win_line = check_swim_game_winner(st.session_state.swim_toe_board)
+                    st.session_state.swim_toe_winner = new_winner
+                    st.session_state.swim_toe_win_line = win_line
+
+                    if new_winner is None:
+                        st.session_state.swim_toe_turn = "⭕" if turn == "❌" else "❌"
+
+                    st.session_state.swim_toe_feedback = f"Corretto — {matched_name} conquista la casella."
+                    st.session_state.swim_toe_feedback_kind = "success"
+                else:
+                    st.session_state.swim_toe_misses[turn] += 1
+                    st.session_state.swim_toe_turn = "⭕" if turn == "❌" else "❌"
+                    st.session_state.swim_toe_feedback = (
+                        f"{answer_to_check} non soddisfa {row_value} × {col_value}. "
+                        f"{turn} perde il turno."
+                    )
+                    st.session_state.swim_toe_feedback_kind = "error"
+
+                st.session_state.swim_toe_selected = None
+                st.session_state.swim_toe_hint = ""
+                st.rerun()
+
+    st.markdown("---")
+
+    with st.expander("Atleti già utilizzati"):
+        shown_used = [
+            st.session_state.swim_toe_answers[i][j]
+            for i in range(3) for j in range(3)
+            if st.session_state.swim_toe_answers[i][j] != ""
+        ]
+        st.write(", ".join(shown_used) if shown_used else "Nessuno per ora.")
+
+    with st.expander("Perché questo gioco fa parte del sito"):
+        st.markdown(
+            "Osservare un grafico è un’attività passiva; ricordare il nome di un atleta non lo è. "
+            "La griglia richiede di combinare contemporaneamente due regole, per esempio una gara e "
+            "una nazionalità oppure uno stile e un decennio. È lo stesso tipo di collegamento che il "
+            "resto del sito invita a fare attraverso i dati. Ogni risposta accettata corrisponde a "
+            "una riga reale del dataset dei record mondiali."
+        )
+=======
+    with st.expander("Top performances raw preview"):
+        st.dataframe(top.head(100), use_container_width=True)
+>>>>>>> parent of 429c99e (gioco)
