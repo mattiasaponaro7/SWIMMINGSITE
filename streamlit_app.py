@@ -1,8 +1,11 @@
 import re
+<<<<<<< HEAD
 import base64
 import random
 import unicodedata
 from difflib import get_close_matches
+=======
+>>>>>>> parent of 429c99e (gioco)
 from pathlib import Path
 from urllib.parse import quote
 
@@ -1402,6 +1405,7 @@ st.markdown(
             padding-top: 1.2rem;
         }
     }
+<<<<<<< HEAD
 
     @media (max-width: 430px) {
         .block-container { padding-left: 0.65rem !important; padding-right: 0.65rem !important; }
@@ -1413,6 +1417,9 @@ st.markdown(
         .athlete-stat-value { font-size: 21px; }
     }
 
+=======
+    
+>>>>>>> parent of 429c99e (gioco)
     </style>
     """,
     unsafe_allow_html=True
@@ -2227,6 +2234,7 @@ def reset_swim_record_toe(game_df, row_col, col_col):
 
 PAGES = [
     "Home",
+<<<<<<< HEAD
     "Cronologia dei record mondiali",
     "Top 200 di tutti i tempi",
     "Galleria dei campioni",
@@ -2256,6 +2264,37 @@ PAGE_TAGS = {
     "Confronto tra gare": "Sfida tra gare",
     "Dati e metodi": "Dietro i dati",
     "Gioco": "Gioca e indovina"
+=======
+    "World Record Timeline",
+    "Current World Records",
+    "All-Time Top 200 Rankings",
+    "Athletes Hall of Fame",
+    "Nations & Places",
+    "Compare Events",
+    "Data & Methods"
+]
+
+PAGE_LABELS = {
+    "Home": "Home",
+    "World Record Timeline": "Timeline",
+    "Current World Records": "Records",
+    "All-Time Top 200 Rankings": "Top 200",
+    "Athletes Hall of Fame": "Athletes",
+    "Nations & Places": "Nations",
+    "Compare Events": "Compare",
+    "Data & Methods": "Methods"
+}
+
+PAGE_TAGS = {
+    "Home": "Start block",
+    "World Record Timeline": "Record flow",
+    "Current World Records": "Gold lane",
+    "All-Time Top 200 Rankings": "Elite depth",
+    "Athletes Hall of Fame": "Legends",
+    "Nations & Places": "Maps & flags",
+    "Compare Events": "Race match",
+    "Data & Methods": "Behind data"
+>>>>>>> parent of 429c99e (gioco)
 }
 
 # Read selected page from the URL.
@@ -2852,8 +2891,105 @@ elif page == "Cronologia dei record mondiali":
         hide_index=True
     )
 
+<<<<<<< HEAD
+=======
+
 # ============================================================
-# PAGE 3 - ALL-TIME TOP 200 RANKINGS
+# PAGE 3 - CURRENT WORLD RECORDS
+# ============================================================
+
+elif page == "Current World Records":
+
+    section(
+        "Current World Records",
+        "A clean overview of the records that currently define the limit of swimming performance."
+    )
+
+    current = wr[wr["is_current_bool"] == True].copy()
+
+    filtered = apply_common_filters(
+        current,
+        gender=True,
+        course=True,
+        stroke=True,
+        distance=True,
+        key_prefix="current"
+    )
+
+    if filtered.empty:
+        st.warning("No current records available for the selected filters.")
+        st.stop()
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        st.metric("Current records shown", len(filtered))
+
+    with c2:
+        st.metric("Athletes", filtered["name"].nunique())
+
+    with c3:
+        st.metric("Nations", filtered["nationality"].nunique())
+
+    with c4:
+        newest_year = int(filtered["year"].max()) if filtered["year"].notna().any() else "-"
+        st.metric("Most recent record year", newest_year)
+
+    st.markdown(
+        """
+        <div class="warning-box">
+        Direct time comparison across different distances is not analytically fair.
+        Use filters to compare similar events, or read this page as a lookup view of current records.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    display = filtered.copy()
+    display["label"] = display["event_label"] + " — " + display["name"]
+
+    fig = px.bar(
+        display.sort_values("seconds", ascending=True),
+        x="seconds",
+        y="label",
+        orientation="h",
+        color="gender",
+        color_discrete_map=GENDER_COLORS,
+        hover_data=["time", "nationality", "meet", "location", "date"],
+        title="Current world records selected"
+    )
+    fig.update_layout(yaxis=dict(autorange="reversed"))
+    fig.update_xaxes(title="Time in seconds")
+    fig.update_yaxes(title="")
+    fig = plotly_clean_layout(fig, height=max(420, 26 * len(display)))
+    st.plotly_chart(fig, use_container_width=True)
+
+    table_cols = [
+        "event_label", "time", "seconds", "name", "nationality",
+        "date", "meet", "location"
+    ]
+
+    st.dataframe(
+        filtered[table_cols].rename(
+            columns={
+                "event_label": "Event",
+                "time": "Time",
+                "seconds": "Seconds",
+                "name": "Athlete",
+                "nationality": "Nationality",
+                "date": "Date",
+                "meet": "Meet",
+                "location": "Location"
+            }
+        ),
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+>>>>>>> parent of 429c99e (gioco)
+# ============================================================
+# PAGE 4 - ALL-TIME TOP 200 RANKINGS
 # ============================================================
 
 elif page == "Top 200 di tutti i tempi":
@@ -3136,7 +3272,7 @@ elif page == "Top 200 di tutti i tempi":
 
 
 # ============================================================
-# PAGE 4 - ATHLETES HALL OF FAME
+# PAGE 5 - ATHLETES HALL OF FAME
 # ============================================================
 
 elif page == "Galleria dei campioni":
@@ -3689,7 +3825,7 @@ elif page == "Galleria dei campioni":
                 unsafe_allow_html=True,
             )
 # ============================================================
-# PAGE 5 - NATIONS & PLACES
+# PAGE 6 - NATIONS & PLACES
 # ============================================================
 
 elif page == "Nazioni e luoghi":
@@ -3891,7 +4027,7 @@ elif page == "Nazioni e luoghi":
 
 
 # ============================================================
-# PAGE 6 - COMPARE EVENTS
+# PAGE 7 - COMPARE EVENTS
 # ============================================================
 
 elif page == "Confronto tra gare":
@@ -4229,7 +4365,7 @@ elif page == "Confronto tra gare":
 
 
 # ============================================================
-# PAGE 7 - DATA & METHODS
+# PAGE 8 - DATA & METHODS
 # ============================================================
 
 elif page == "Dati e metodi":
@@ -4335,6 +4471,7 @@ elif page == "Dati e metodi":
     with st.expander("Anteprima dei record mondiali grezzi"):
         st.dataframe(wr.head(100), use_container_width=True)
 
+<<<<<<< HEAD
     with st.expander("Anteprima delle prestazioni top grezze"):
         st.dataframe(top.head(100), use_container_width=True)
 
@@ -4766,3 +4903,7 @@ elif page == "Gioco":
             "resto del sito invita a fare attraverso i dati. Ogni risposta accettata corrisponde a "
             "una riga reale del dataset dei record mondiali."
         )
+=======
+    with st.expander("Top performances raw preview"):
+        st.dataframe(top.head(100), use_container_width=True)
+>>>>>>> parent of 429c99e (gioco)
